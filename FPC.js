@@ -47,7 +47,7 @@ const FILTER_GET = [
 
 //Whitelisted GET parameters 
 const ALLOWED_GET = [
-]
+];
 
 // URLs will not be cached 
 const BYPASS_URL = [
