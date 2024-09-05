@@ -23,8 +23,8 @@ For CF FPC Worker to consider a response from a Magento backend as cacheable, th
  - Url doesn't match the worker's blacklist
 
 # Worker and CF cache limitations:
- - The full-page cache is designed to work with the default magento cache, which is PHP Built-in FPC, FAST FPC (See repo: https://github.com/Genaker/FastFPC), or Varnish. You can try to use it as a main cache, but it is not it was designed for. 
- - You can't clear the cache by page. You can clear the entire cache only. That is why you need a default magento cache. However, it is designed to work without any cache clears. The worker will update it asynchronously. You mark the entire cache stale by changing its version. To hard clear the cache, you need to change the version twice. CF Worker checks the previous cache version as a stale cache.
+ - The full-page cache is designed to work with the default magento cache, which is PHP Built-in FPC, FAST FPC (See repo: https://github.com/Genaker/FastFPC), or Varnish. You can try to use it as a main cache (see Cache Reserve), but it is not what it was designed for. ***The main idea of the CF Worker FPC Cache is Magento 2 pages are always served from the CF cache with async revalidation.**
+ - You can't clear the cache by page. You can clear the entire cache only. That is why you need a default magento cache. However, it is designed to work without any cache clears. The worker will update it asynchronously. You mark the entire cache stale by changing its version. To hard clear the cache, you need to change the version twice. CF Worker checks the previous cache version to see if it is a stale cache.
 
 ## Installation
 Open Cloud Flare and Go to Workers
@@ -80,7 +80,7 @@ You can also exclude some page rules, such as static and media, from workers. It
 
 ![image](https://github.com/user-attachments/assets/2b6efc70-99ae-49a7-bbba-3eb4f174e636)
 
-Also, Enable CF Cache Reserve to increase edge cache HIT rate. Also, exclude media and static from the cache reserve.
+Also, Enable CF Cache Reserve to increase edge cache HIT rate. You can exclude media and static from the cache reserve to reduce CF costs. However, cache reserve is a nice stuff, and you can benefit from storing images in it. 
 
 ![image](https://github.com/user-attachments/assets/0c1bc4df-483e-45c8-b3a2-44cfe6dab817)
 
@@ -101,7 +101,7 @@ You can add any cookies you want just by changing the script.
 
 # Cache Reserve 
 
-Cache Reserve is a large, persistent data store implemented on top of CF R2. Your website’s cacheable FPC content will be written to Cache Reserve. Cache Reserve serves as the ultimate upper-tier cache that will reserve storage space for your FPC for as long as you want. This ensures that your FPC is served from the cache. 
+Cache Reserve is a large, persistent data store implemented on top of CF R2. Your website’s cacheable FPC content will be written to Cache Reserve. Cache Reserve serves as the ultimate upper-tier cache, reserving storage space for your FPC for as long as you want. This ensures that your FPC is served from the cache. Cache Reserve is a CF feature that allows the use of Claud Flare as a main cache solution. 
 
 ![image](https://github.com/user-attachments/assets/e8facd2a-0240-4c69-941d-8dd04b18055c)
 
