@@ -105,5 +105,18 @@ Cache Reserve is a large, persistent data store implemented on top of CF R2. You
 
 ![image](https://github.com/user-attachments/assets/e8facd2a-0240-4c69-941d-8dd04b18055c)
 
+Like the standard CDN, Cache Reserve also uses the cf-cache-status header to indicate cache statuses like MISS, HIT, and REVALIDATED. Cache Reserve cache misses and hits are factored into the dashboard’s cache hit ratio.
+
+Individual sampled requests that were filled or were served by Cache Reserve are viewable via the CacheReserveUsed Logpush field.
+
+Cache Reserve monthly operations and storage usage are viewable in the dashboard.
+
+# Statistic
+
+With the CF FPC Workers, you can achieve 91%+ page cache rate from CDN
+
+![image](https://github.com/user-attachments/assets/481cf2a3-bb7a-477f-a2cf-a014123a3643)
+
+
 
 
