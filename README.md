@@ -16,7 +16,7 @@ CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if
  - If a cached version isn't found, the CF FPC worker sends a request to the Magento server to be used for future requests.
 
 # Caching criteria
-For CF FPC Worker to consider a response from a MAgento backend as cacheable, the response must meet the following criteria:
+For CF FPC Worker to consider a response from a Magento backend as cacheable, the response must meet the following criteria:
 
  - Be a response to a GET request
  - Have a 2XX or 3XX status code.
@@ -75,7 +75,7 @@ Key-value storage features 4
 ![image](https://github.com/user-attachments/assets/da91073b-7982-4b12-8b2a-b0fb92424168)
 
 
-Done! Test it using Dev Console 
+Done! Test it using Dev Console. 
 
 ![image](https://github.com/user-attachments/assets/7545b416-b5e5-4f3e-82c2-142e7edb2522)
 
@@ -91,3 +91,15 @@ Please update this documentation when you will do it yourself. It is just a fast
 For detailed information, check the Worker code. 
 
 If you have any issues, create an issue or email me: egorshitikov[A]gmail.com
+
+# Cache Debug Cockies
+You can add any cookies you want just by changing the script.
+
+Default Cookies: 
+![image](https://github.com/user-attachments/assets/cdc29850-b8cf-4549-ad73-6b494927931a)
+
+Cloud Flare Default cookies: 
+
+![image](https://github.com/user-attachments/assets/94f38f9f-1fa1-4119-96ef-1ffa4c7867b2)
+
+
