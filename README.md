@@ -7,7 +7,7 @@ The original idea was the Shopify FPC cache from the CloudFlare CDN.
 
 
 # How it works
-The Edge Worker Magento full-page cache feature helps you optimize eCommerce performance by caching the generated HTML pr API response from your Magento backend server. 
+The Edge Worker Magento full-page cache feature helps you optimize eCommerce performance by caching the generated HTML or API response from your Magento backend server. 
 
 CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if a cached version of the requested content is available in the CloudFlare locations or in the cache Reserve. This check for the cached version can have the following outcomes, depending on its state:
 
@@ -90,3 +90,4 @@ Also, Enable CF Cache Reserve to increase edge cache HIT rate. Also, exclude med
 Please update this documentation when you will do it yourself. It is just a fast written manual. 
 For detailed information, check the Worker code. 
 
+If you have any issues, create an issue or email me: egorshitikov[A]gmail.com
