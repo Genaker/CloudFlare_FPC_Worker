@@ -1,12 +1,12 @@
 # CloudFlare Worker FPC
 CloudFlare(CF) CDN Worker Full Page Cache(FPC) Layer for Magento 2.
-It becomes true. Now, it is Open Source and free. 
+It has become true. Now, it is Open Source and free. 
 The original idea was the Shopify FPC cache from the CloudFlare CDN.
 
 ![image](https://github.com/user-attachments/assets/1dcb535e-3d0d-4e0a-b399-9f331807420d)
 
 # How it works
-The Edge Worker Magento full-page cache feature helps you optimize eCommerce performance by caching the generated HTML or API response from your Magento backend server. 
+The Edge Worker Magento full-page cache feature helps you optimize eCommerce performance by caching your Magento backend server's generated HTML or API response. 
 
 CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if a cached version of the requested content is available in the CloudFlare locations or in the cache Reserve. This check for the cached version can have the following outcomes, depending on its state:
 
