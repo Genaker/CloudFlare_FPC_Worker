@@ -2,7 +2,6 @@
 // using the variable name EDGE_CACHE. or the API parameters below should be
 // configured. KV is recommended if possible since it can purge just the HTML
 // instead of the full cache.
-// Forked From: https://github.com/cloudflare/templates/tree/main/examples/edge-cache-html
 
 // Separate cache for the mobile devices
 const MOBILECACHE_DIFFERENT = false;
@@ -14,12 +13,13 @@ const CLOUDFLARE_API = {
     zone: ""   // "Zone ID" from the API section of the dashboard overview page https://dash.cloudflare.com/
 };
 
+// No cache values
 const CACHE_CONTROL_NO_CACHE = [
     'no-cache',
     'no-store'
 ];
 
-// Default cookie prefixes for logged in users
+// Default cookie prefixes for logged-in users
 const VERSION_COOKIES = [
     "X-Magento-Vary"
 ];
@@ -31,6 +31,7 @@ const DEFAULT_BYPASS_COOKIES = [
 
 const DEBUG = true;
 
+// Filtered get parameters 
 const FILTER_GET = [
     // Facebook related
     'utm_source',
@@ -44,6 +45,11 @@ const FILTER_GET = [
     '_ga'
 ];
 
+//Whitelisted GET parameters 
+const ALLOWED_GET = [
+]
+
+// URLs will not be cached 
 const BYPASS_URL = [
     'order',
     'onestepcheckout',
@@ -68,12 +74,15 @@ const BYPASS_URL = [
     'fpc'
 ];
 
+// URL will always be cached no matter what 
 const CACHE_ALWAYS = [
     //  'banner/ajax/load'
 ]
 
 //Some legacy stuff. Bots doesn't have it and produces cache MISSES
 const ACCEPT_CONTENT_HEADER = 'Accept';
+// Revalidate the cache every N sec
+// User will receive old/stale version 
 const REVALIDATE_AGE = 360;
 
 /**
@@ -140,7 +149,8 @@ async function processRequest(originalRequest, event) {
     let isHTML = true;//(accept && accept.indexOf('text/html') >= 0);
 
     console.log("isHTML: " + isHTML);
-    //Cache everything by default ToDo exclude mime types
+    //Cache everything by default 
+    //ToDo: exclude some mime types
     isHTML = true;
 
     let { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways } = await getCachedResponse(originalRequest);
@@ -214,11 +224,11 @@ async function processRequest(originalRequest, event) {
 
                     let age = response.headers.get('age');
 
-                    // If cache is new don't send backend request
+                    // If the cache is new, don't send the backend request
                     if (needsRevalidate || age > REVALIDATE_AGE) {
                         status += ', Refreshed';
                         // In service workers, waitUntil() tells the browser that work is ongoing until 
-                        // the promise settles, and it shouldn't terminate the service worker if it wants that work to complete.
+                        // the promise settles, and it shouldn't terminate the service worker if it wants that work to be complete.
                         // ToDO: optimize this stuff for better server performance by reducing backend server requests 
                         event.waitUntil(updateCache(originalRequest, cacheVer, event, cacheAlways));
                     } else {
@@ -305,7 +315,7 @@ function shouldBypassURL(request) {
     if (BYPASS_URL && BYPASS_URL.length) {
         //console.log(BYPASS_URL);
         for (let pass of BYPASS_URL) {
-            // See if the url starts with any of the logged-in user prefixes
+            // See if the URL starts with any of the logged-in user prefixes
             //console.log("check: " + pass);
 
             if (request.url.indexOf(pass) >= 0) {
@@ -349,7 +359,7 @@ async function getCachedResponse(request) {
         }
     }
 
-    // Always cache some URLS 
+    // Always cache some URLs 
     if (!cacheAlways) {
         byPassUrl = shouldBypassURL(request);
 
@@ -368,7 +378,6 @@ async function getCachedResponse(request) {
 
     let noCache = false;
     let needsRevalidate = false;
-
 
     /*if (cacheControl && cacheControl.indexOf('no-cache') !== -1) {
       noCache = true;
@@ -394,9 +403,9 @@ async function getCachedResponse(request) {
 
             let useStale = true;
 
-            // Return previous version of the cache ...
+            // Return the previous version of the cache ...
             if (useStale && !cachedResponse) {
-                //check previous version of the cache befor purge and soft revalidate
+                //check the previous version of the cache before purge and soft revalidate
                 const cacheKeyRequest = GenerateCacheRequestUrlKey(request, cacheVer - 1, cacheAlways);
 
                 // Trying again with the previous cache version
@@ -413,7 +422,7 @@ async function getCachedResponse(request) {
                 if (DEBUG)
                     cachedResponse.headers.set("Key", cacheKeyRequest.url.toString());
 
-                // ToDo: bypassCache is alway false inside of this IF. Refactor needed
+                // ToDo: bypassCache is always false inside this IF. Refactor needed
                 // Copy the original cache headers back and clean up any control headers
 
                 status += ' Hit';
@@ -514,8 +523,8 @@ async function cacheResponse(cacheVer, request, originalResponse, event, cacheAl
 
         try {
             // Move the cache headers out of the way so the response can actually be cached.
-            // First clone the response so there is a parallel body stream and then
-            // create a new response object based on the clone that we can edit.
+            // First, clone the response so there is a parallel body stream and then
+            //Create a new response object based on the clone that we can edit.
             let cache = caches.default;
             let clonedResponse = originalResponse.clone();
             let response = new Response(clonedResponse.body, clonedResponse);
@@ -654,13 +663,11 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
     // Add Version Cookie
     let versionKeys = VERSION_COOKIES;
 
-
-
     if (MOBILECACHE_DIFFERENT === true) {
         // Requires Enterprise "CF-Device-Type Header" zone setting or
         let device = request.headers.get("CF-Device-Type");
         console.log("Device: " + device);
-        // If the device is mobile, add a something to the cache key.
+        // If the device is mobile, add something to the cache key.
 
         if (device === "mobile") {
             additionalParam += "mobile";
@@ -684,7 +691,7 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
             }
         }
     }
-    // if additional param is not empty 
+    // if the additional param is not empty 
     if (additionalParam.length > 2) {
         additionalParam = '&add=' + btoa(additionalParam);
     }
