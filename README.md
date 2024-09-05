@@ -5,14 +5,13 @@ The original idea was the Shopify FPC cache from the CloudFlare CDN.
 
 ![image](https://github.com/user-attachments/assets/1dcb535e-3d0d-4e0a-b399-9f331807420d)
 
-
 # How it works
 The Edge Worker Magento full-page cache feature helps you optimize eCommerce performance by caching the generated HTML or API response from your Magento backend server. 
 
 CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if a cached version of the requested content is available in the CloudFlare locations or in the cache Reserve. This check for the cached version can have the following outcomes, depending on its state:
 
  - If a cached version is found and it's not stale, then the cached content is served to the user. No request is made to the Magento Server.
- - If a cached version is found and it is stale, then the cached content is served to the user. The CF worker is executed in the background and requests a new version of the page caches from the Magento backend server for future requests.
+ - If a cached version is found and it is stale, then the cached content is served to the user. The CF worker is executed in the background and requests a new version of the page caches from the Magento backend server for future requests. CF FPC is revalidated from the server asynchronously after 5 minutes or so, but you can change the time and logic.
  - If a cached version isn't found, the CF FPC worker sends a request to the Magento server to be used for future requests.
 
 # Caching criteria
@@ -25,7 +24,7 @@ For CF FPC Worker to consider a response from a Magento backend as cacheable, th
 
 # Worker and CF cache limitations:
  - The full-page cache is designed to work with the default magento cache, which is PHP FPC, FAST FPC (See extension), or Varnish. You can try to use it as a main cache, but it is not it was designed for. 
- - You can't clear the cache by page. You can clear the entire cache only. That is why you need a default magento cache. However, it is designed to work without any cache clears. The worker will update it asynchronously. You mark the entire cache stale by changing its version. To hard clear cache you need change version twice. CF Worker checks the previous cache version as a stale cache.
+ - You can't clear the cache by page. You can clear the entire cache only. That is why you need a default magento cache. However, it is designed to work without any cache clears. The worker will update it asynchronously. You mark the entire cache stale by changing its version. To hard clear the cache, you need to change the version twice. CF Worker checks the previous cache version as a stale cache.
 
 ## Installation
 Open Cloud Flare and Go to Workers
@@ -67,13 +66,11 @@ Key-value storage features 4
 
 ![image](https://github.com/user-attachments/assets/7955f63a-541e-44e9-b650-40901ea3af97)
 
-
- Set your website route and worker to trigger:
+# Set your website route and worker to trigger:
 
 ![image](https://github.com/user-attachments/assets/405b8681-ed58-470f-8627-d5cde01f3dfc)
 
 ![image](https://github.com/user-attachments/assets/da91073b-7982-4b12-8b2a-b0fb92424168)
-
 
 Done! Test it using Dev Console. 
 
@@ -87,7 +84,7 @@ Also, Enable CF Cache Reserve to increase edge cache HIT rate. Also, exclude med
 
 ![image](https://github.com/user-attachments/assets/0c1bc4df-483e-45c8-b3a2-44cfe6dab817)
 
-Please update this documentation when you will do it yourself. It is just a fast written manual. 
+Please update this documentation when you will do it yourself. It is just a fast-written manual. 
 For detailed information, check the Worker code. 
 
 If you have any issues, create an issue or email me: egorshitikov[A]gmail.com
@@ -95,11 +92,18 @@ If you have any issues, create an issue or email me: egorshitikov[A]gmail.com
 # Cache Debug Cockies
 You can add any cookies you want just by changing the script.
 
-Default Cookies: 
+# Default Cookies: 
 ![image](https://github.com/user-attachments/assets/cdc29850-b8cf-4549-ad73-6b494927931a)
 
-Cloud Flare Default cookies: 
+# Cloud Flare Default cookies: 
 
 ![image](https://github.com/user-attachments/assets/94f38f9f-1fa1-4119-96ef-1ffa4c7867b2)
+
+# Cache Reserve 
+
+Cache Reserve is a large, persistent data store implemented on top of CF R2. Your website’s cacheable FPC content will be written to Cache Reserve. Cache Reserve serves as the ultimate upper-tier cache that will reserve storage space for your FPC for as long as you want. This ensures that your FPC is served from the cache. 
+
+![image](https://github.com/user-attachments/assets/e8facd2a-0240-4c69-941d-8dd04b18055c)
+
 
 
