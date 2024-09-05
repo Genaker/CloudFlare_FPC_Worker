@@ -22,6 +22,12 @@ For CF FPC Worker to consider a response from a Magento backend as cacheable, th
  - Have a public Cache-Control header set with a non zero max-age, or s-maxage, value
  - Url doesn't match the worker's blacklist
 
+# Aditional features
+- URL Query String Filtering and sorting 
+- Traffic filtering and control
+- Cache logic adjustment. You don't need any VCL now you can do everething in pure JavaScript
+- Content manipulation
+
 # Worker and CF cache limitations:
  - The full-page cache is designed to work with the default magento cache, which is PHP Built-in FPC, FAST FPC (See repo: https://github.com/Genaker/FastFPC), or Varnish. You can try to use it as a main cache (see Cache Reserve), but it is not what it was designed for. ***The main idea of the CF Worker FPC Cache is Magento 2 pages are always served from the CF cache with async revalidation.**
  - You can't clear the cache by page. You can clear the entire cache only. That is why you need a default magento cache. However, it is designed to work without any cache clears. The worker will update it asynchronously. You mark the entire cache stale by changing its version. To hard clear the cache, you need to change the version twice. CF Worker checks the previous cache version to see if it is a stale cache.
