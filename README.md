@@ -23,7 +23,7 @@ For CF FPC Worker to consider a response from a Magento backend as cacheable, th
  - Url doesn't match the worker's blacklist
 
 # Worker and CF cache limitations:
- - The full-page cache is designed to work with the default magento cache, which is PHP FPC, FAST FPC (See extension), or Varnish. You can try to use it as a main cache, but it is not it was designed for. 
+ - The full-page cache is designed to work with the default magento cache, which is PHP FPC, FAST FPC (See repo: https://github.com/Genaker/FastFPC), or Varnish. You can try to use it as a main cache, but it is not it was designed for. 
  - You can't clear the cache by page. You can clear the entire cache only. That is why you need a default magento cache. However, it is designed to work without any cache clears. The worker will update it asynchronously. You mark the entire cache stale by changing its version. To hard clear the cache, you need to change the version twice. CF Worker checks the previous cache version as a stale cache.
 
 ## Installation
