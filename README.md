@@ -123,6 +123,17 @@ With the CF FPC Workers, you can achieve 91%+ page cache rate from CDN
 
 ![image](https://github.com/user-attachments/assets/481cf2a3-bb7a-477f-a2cf-a014123a3643)
 
+# Test 
+Open the page. Check **Cf-Cache-Status** header.
+![image](https://github.com/user-attachments/assets/859734b2-4aa1-489c-b16a-56dbd8b4481c)
+
+![image](https://github.com/user-attachments/assets/4a37c78f-08a4-4572-94b4-d5ee0d4535d9)
+
+Timing: Server response time must be less than 60ms. 
+![image](https://github.com/user-attachments/assets/5d20a929-e2c3-4a42-9adf-7f703c9a2a2b)
+
+
+
 
 
 
