@@ -56,14 +56,29 @@ Key-value storage features 4
 
 # Create KV (KeyValue) Storage to keep the cache version and some global settings 
 
-![image](https://github.com/user-attachments/assets/38b22514-f827-41b9-b254-7da684afa685)
+![image](https://github.com/user-attachments/assets/243248a6-1a90-4a66-a569-3561f94e3df7)
+Workers & Pages -> KV -> Create a namespace 
+![image](https://github.com/user-attachments/assets/c1ec9f72-e60f-4a38-9f14-38439f3b8528)
+
 
 # Create Worker 
 
 ![image](https://github.com/user-attachments/assets/3ba61a60-1f19-488a-903e-88416054911e)
 
+Workers & Pages -> Overview -> Create -> Create Worker -> Deploy
+
+![image](https://github.com/user-attachments/assets/1f9b47eb-e5b7-473b-9d0f-f226f836cf97)
+
+![image](https://github.com/user-attachments/assets/9ccc8bb9-2279-40bf-ab15-6a04029db33f)
+
+![image](https://github.com/user-attachments/assets/91c5a59f-41b4-4343-861b-809f75deacae)
+Worker *Variable name* must be **EDGE_CACHE**. KV name doesn't matter (Select from the drop-down)
 
 # Insert CF Worker FPC Code from The repo 
+![image](https://github.com/user-attachments/assets/bc2f608f-5df0-46cf-98c6-641bf785bca7)
+Edit Code -> Insert Code From the Git 
+
+![image](https://github.com/user-attachments/assets/5a39b35a-3b21-4f53-963d-7678b47b40f4)
 
 
 # Configure Worker
@@ -78,6 +93,9 @@ Key-value storage features 4
 
 ![image](https://github.com/user-attachments/assets/da91073b-7982-4b12-8b2a-b0fb92424168)
 
+![image](https://github.com/user-attachments/assets/0d410e59-41bf-4a58-9d4e-4b62ca107b43)
+
+
 Done! Test it using Dev Console. 
 
 ![image](https://github.com/user-attachments/assets/7545b416-b5e5-4f3e-82c2-142e7edb2522)
@@ -86,9 +104,23 @@ You can also exclude some page rules, such as static and media, from workers. It
 
 ![image](https://github.com/user-attachments/assets/2b6efc70-99ae-49a7-bbba-3eb4f174e636)
 
-Also, Enable CF Cache Reserve to increase edge cache HIT rate. You can exclude media and static from the cache reserve to reduce CF costs. However, cache reserve is a nice stuff, and you can benefit from storing images in it. 
+Also, Enable CF Cache Reserve to increase edge cache HIT rate. To reduce CF costs, you can exclude media and static from the cache reserve. However, cache reserve is a nice stuff, and you can benefit from storing images in it. 
 
 ![image](https://github.com/user-attachments/assets/0c1bc4df-483e-45c8-b3a2-44cfe6dab817)
+
+Disable Cloud Flare Chache for Static and Media save and serve from the **Cache Reserve** <be \>
+Caching -> Cache Rules
+![image](https://github.com/user-attachments/assets/bb3cca02-d45e-4f2b-bf5a-18bfee851c46)
+
+Add Rule 
+
+![image](https://github.com/user-attachments/assets/24233c85-4a75-4462-b78c-2bd3c91f4b11)
+Expression : 
+
+```
+(http.request.full_uri wildcard "*.site.com/static/*") or (http.request.full_uri wildcard "*.site.com/media/*"
+```
+Replace **site** with your <be \>
 
 Please update this documentation when you will do it yourself. It is just a fast-written manual. 
 For detailed information, check the Worker code. 
