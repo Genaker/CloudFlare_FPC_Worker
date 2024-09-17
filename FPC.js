@@ -45,6 +45,12 @@ const FILTER_GET = [
     '_ga'
 ];
 
+const CACHE_STATUSES = [
+    200,
+    302,
+    301
+];
+
 //Whitelisted GET parameters 
 const ALLOWED_GET = [
 ];
@@ -191,7 +197,7 @@ async function processRequest(originalRequest, event) {
             //if(options === null) options.cache = true;
 
             if ((!options || options.cache) && isHTML &&
-                originalRequest.method === 'GET' && response.status === 200 &&
+                originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) &&
                 !bypassCache) {
 
                 console.log("Caching...");
@@ -216,7 +222,7 @@ async function processRequest(originalRequest, event) {
             status += ', Stale';
             console.log("Hit from the previous version Needs Revalidate: Current V: " + cacheVer + " Previous: " + (cacheVer - 1))
         }
-        if (originalRequest.method === 'GET' && response.status === 200 && isHTML) {
+        if (originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
             bypassCache = bypassCache || shouldBypassEdgeCache(originalRequest, response);
             if (needsRevalidate || !bypassCache) {
                 const options = getResponseOptions(response);
@@ -239,7 +245,7 @@ async function processRequest(originalRequest, event) {
         }
     }
 
-    if (response && status !== null && originalRequest.method === 'GET' && response.status === 200 && isHTML) {
+    if (response && status !== null && originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
         response = new Response(response.body, response);
         if (DEBUG)
             response.headers.set('x-HTML-Edge-Cache-Status', status);
@@ -517,7 +523,7 @@ async function cacheResponse(cacheVer, request, originalResponse, event, cacheAl
     let status = "";
     const accept = request.headers.get(ACCEPT_CONTENT_HEADER);
     console.log("ACCEPT_CONTENT_HEADER: " + accept);
-    if (request.method === 'GET' && originalResponse.status === 200 /*&& accept && accept.indexOf('text/html') >= 0*/) {
+    if (request.method === 'GET' && CACHE_STATUSES.includes(originalResponse.status)  /*&& accept && accept.indexOf('text/html') >= 0*/) {
         cacheVer = await GetCurrentCacheVersion(cacheVer);
         const cacheKeyRequest = GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways);
 
