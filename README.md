@@ -71,9 +71,6 @@ Workers & Pages -> Overview -> Create -> Create Worker -> Deploy
 
 ![image](https://github.com/user-attachments/assets/9ccc8bb9-2279-40bf-ab15-6a04029db33f)
 
-![image](https://github.com/user-attachments/assets/91c5a59f-41b4-4343-861b-809f75deacae)
-Worker *Variable name* must be **EDGE_CACHE**. KV name doesn't matter (Select from the drop-down)
-
 # Insert CF Worker FPC Code from The repo 
 ![image](https://github.com/user-attachments/assets/bc2f608f-5df0-46cf-98c6-641bf785bca7)
 Edit Code -> Insert Code From the Git 
@@ -86,6 +83,13 @@ Edit Code -> Insert Code From the Git
 ![image](https://github.com/user-attachments/assets/ccb4ba67-bc60-492e-a6d7-99ac6cdf983b)
 
 ![image](https://github.com/user-attachments/assets/7955f63a-541e-44e9-b650-40901ea3af97)
+
+![image](https://github.com/user-attachments/assets/91c5a59f-41b4-4343-861b-809f75deacae)
+Worker *Variable name* must be **EDGE_CACHE**. KV name doesn't matter (Select from the drop-down)
+
+![image](https://github.com/user-attachments/assets/8500a84b-931d-448f-9a7c-578e109399a4)
+Configure the **OTER_HOST** (for example, google.com) variable to test workers through the worker domain. This will replace the worker domain with your staging or prod domain, and the server response will be fetched from there. 
+
 
 # Set your website route and worker to trigger:
 
