@@ -37,13 +37,12 @@ Open Cloud Flare and Go to Workers
 
 ![image](https://github.com/user-attachments/assets/9366da1d-8c40-4d38-9834-7f16f9805c3b)
 
-Upgrading the plan to a bundle of 5$ months is better to avoid limitations.
+It is better to Upgrade the plan to a Bundle of 5$ per month. It is better and has no limitations.
 
-![image](https://github.com/user-attachments/assets/b7579fc4-0509-4828-8fc3-2bd04e531b56)
+![image](https://github.com/user-attachments/assets/51a1cbc3-0089-4b2b-bd3a-4ddf2ec35f55)
 
 Bundle: 
-
-![image](https://github.com/user-attachments/assets/2613e81c-ec95-4387-82b4-f740da954707)
+![image](https://github.com/user-attachments/assets/9bcbee80-fe05-47a9-a075-6c9f5ee73c32)
 
 Workers features
 Includes 10 million requests per month 3
@@ -63,8 +62,6 @@ Workers & Pages -> KV -> Create a namespace
 
 # Create Worker 
 
-![image](https://github.com/user-attachments/assets/3ba61a60-1f19-488a-903e-88416054911e)
-
 Workers & Pages -> Overview -> Create -> Create Worker -> Deploy
 
 ![image](https://github.com/user-attachments/assets/1f9b47eb-e5b7-473b-9d0f-f226f836cf97)
@@ -79,6 +76,7 @@ Edit Code -> Insert Code From the Git
 
 
 # Configure Worker
+![image](https://github.com/user-attachments/assets/3ba61a60-1f19-488a-903e-88416054911e)
 
 ![image](https://github.com/user-attachments/assets/ccb4ba67-bc60-492e-a6d7-99ac6cdf983b)
 
@@ -88,7 +86,7 @@ Edit Code -> Insert Code From the Git
 Worker *Variable name* must be **EDGE_CACHE**. KV name doesn't matter (Select from the drop-down)
 
 ![image](https://github.com/user-attachments/assets/8500a84b-931d-448f-9a7c-578e109399a4)
-Configure the **OTER_HOST** (for example, google.com) variable to test workers through the worker domain. This will replace the worker domain with your staging or prod domain, and the server response will be fetched from there. 
+Configure the **OTHER_HOST** (for example, google.com) variable to test workers through the worker domain. This will replace the worker domain with your staging or prod domain, and the server response will be fetched from there. 
 
 
 # Set your website route and worker to trigger:
