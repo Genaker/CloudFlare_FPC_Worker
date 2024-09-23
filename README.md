@@ -134,14 +134,6 @@ If you have any issues, create an issue or email me: egorshitikov[A]gmail.com
 We also developed a Magento Extension designed to enhance communication and performance between CF Workers and the cache system. <br\>
 While this extension is not yet publicly available, feel free to contact me directly if you’re interested in receiving it.
 
----
-
-We’ve developed a Magento Extension designed to enhance communication and performance between CF Workers and the cache system. While this extension is not yet publicly available, feel free to contact me directly if you’re interested in receiving it.
-
----
-
-Let me know if you’d like any further adjustments!
-
 # Cache Debug Cockies
 You can add any cookies you want just by changing the script.
 
