@@ -14,6 +14,8 @@ CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if
  - If a cached version is found and it is stale, then the cached content is served to the user. The CF worker is executed in the background and requests a new version of the page caches from the Magento backend server for future requests. CF FPC is revalidated from the server asynchronously after 5 minutes or so, but you can change the time and logic.
  - If a cached version isn't found, the CF FPC worker sends a request to the Magento server to be used for future requests.
 
+CF Worker “softpurge” the cache by changing cache Version stored in the KV(Key Value)storage. Cloud flare serve the stale content untill it will not be updayed asynchronously (in the background) fetches the new page. Cloud Front ignores any cache rules from Magento and has own logic which serve web pages from the CDN cache even if Magento 2 website is broken. 
+
 # Caching criteria
 For CF FPC Worker to consider a response from a Magento backend as cacheable, the response must meet the following criteria:
 
