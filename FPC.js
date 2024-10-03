@@ -1,7 +1,7 @@
 // IMPORTANT: Either A Key/Value Namespace must be bound to this worker script
 // using the variable name EDGE_CACHE. or the API parameters below should be
 // configured. KV is recommended if possible since it can purge just the HTML
-// instead of the full cache.
+// instead of the full cache. 
 
 // Separate cache for the mobile devices
 const MOBILECACHE_DIFFERENT = false;
@@ -42,7 +42,10 @@ const FILTER_GET = [
     // google related 
     'gclid',
     'gclsrc',
-    '_ga'
+    'customer-service',
+    'terms-of-service',
+    '_ga',
+    'srsltid' //new google parameter
 ];
 
 const CACHE_STATUSES = [
@@ -53,6 +56,12 @@ const CACHE_STATUSES = [
 
 //Whitelisted GET parameters 
 const ALLOWED_GET = [
+    'product_list_order',
+    'p',
+    'product_list_limit',
+    'q',
+    'fpc',
+    'price'
 ];
 
 // URLs will not be cached 
@@ -120,6 +129,13 @@ addEventListener("fetch", event => {
     // should handle HTML caching in case there are varying levels of support).
     let configured = false;
 
+    if (typeof R2 !== 'undefined') {
+        console.log('R2 is working!!');
+    } else {
+        console.log('R2 is not working!!');
+        const R2 = false;
+    }
+
     if (typeof EDGE_CACHE !== 'undefined') {
         console.log('KV is working!!');
         configured = true;
@@ -159,7 +175,7 @@ async function processRequest(originalRequest, event) {
     //ToDo: exclude some mime types
     isHTML = true;
 
-    let { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways } = await getCachedResponse(originalRequest);
+    let { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways } = await getCachedResponse(originalRequest, event);
 
     // Request to purge cache by Adding Version 
     if (originalRequest.url.indexOf('cfpurge') >= 0) {
@@ -176,7 +192,7 @@ async function processRequest(originalRequest, event) {
         let request = new Request(originalRequest);
         request.headers.set('x-HTML-Edge-Cache', 'supports=cache|purgeall|bypass-cookies');
 
-        status += ', FetchOrigin';
+        status += ', FetchedOrigin,';
         response = await fetch(request);
 
         //ToDo: Seams redundant refactor 
@@ -247,6 +263,8 @@ async function processRequest(originalRequest, event) {
 
     if (response && status !== null && originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
         response = new Response(response.body, response);
+        status = status.replaceAll(",,", ",");
+        status = status.replaceAll(" ", "");
         if (DEBUG)
             response.headers.set('x-HTML-Edge-Cache-Status', status);
         if (cacheVer !== null) {
@@ -268,7 +286,8 @@ async function processRequest(originalRequest, event) {
             response.headers.set('X-Varnish', Date.now() + " " + (Date.now() - 999));
         }
     }
-
+    console.log("Return Response");
+    //console.log("HTML:" + await response.clone().text());
     return response;
 }
 
@@ -343,7 +362,7 @@ const CACHE_HEADERS = ['Cache-Control', 'Expires', 'Pragma'];
  * 
  * @param {Request} request - Original request
  */
-async function getCachedResponse(request) {
+async function getCachedResponse(request, event) {
     let response = null;
     let cacheVer = null;
     let bypassCache = false;
@@ -406,6 +425,9 @@ async function getCachedResponse(request) {
             let cache = caches.default;
 
             let cachedResponse = await cache.match(cacheKeyRequest);
+            if (cachedResponse) {
+                console.log("From CDN EDGE cache");
+            }
 
             let useStale = true;
 
@@ -530,7 +552,7 @@ async function cacheResponse(cacheVer, request, originalResponse, event, cacheAl
         try {
             // Move the cache headers out of the way so the response can actually be cached.
             // First, clone the response so there is a parallel body stream and then
-            //Create a new response object based on the clone that we can edit.
+            // Create a new response object based on the clone that we can edit.
             let cache = caches.default;
             let clonedResponse = originalResponse.clone();
             let response = new Response(clonedResponse.body, clonedResponse);
@@ -542,15 +564,22 @@ async function cacheResponse(cacheVer, request, originalResponse, event, cacheAl
                 }
             }
             response.headers.delete('Set-Cookie');
-            response.headers.set('Cache-Control', 'public; max-age=315360000; stale-if-error=3600');
+            response.headers.delete('Cache-Control');
+            response.headers.delete('Pragma');
+            //response.headers.set('Cache-Control', 'public; max-age=315360000; stale-if-error=3600');
+            response.headers.set('Cache-Control', 'public; s-max-age=315360000');
 
             console.log("Cached:");
             console.log(cacheKeyRequest);
-            console.log(response);
-            event.waitUntil(cache.put(cacheKeyRequest, response));
-            status = ", Cached";
+            //console.log(response);
+            let cdnCachedResponse = response.clone();
+            cdnCachedResponse.headers.delete("R2");
+            event.waitUntil(cache.put(cacheKeyRequest, cdnCachedResponse));
+            status += ",Saved CDN,";
+
         } catch (err) {
-            // status = ", Cache Write Exception: " + err.message;
+            console.log("Catch Cache Error: " + err.message);
+            status += ",Cache Response Exception:" + err.message + ",";
         }
     }
     return status;
