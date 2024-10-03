@@ -1,7 +1,7 @@
 // IMPORTANT: Either A Key/Value Namespace must be bound to this worker script
 // using the variable name EDGE_CACHE. or the API parameters below should be
 // configured. KV is recommended if possible since it can purge just the HTML
-// instead of the full cache. 
+// instead of the full cache.
 
 // Separate cache for the mobile devices
 const MOBILECACHE_DIFFERENT = false;
@@ -9,8 +9,8 @@ const MOBILECACHE_DIFFERENT = false;
 // API settings if KV isn't being used
 const CLOUDFLARE_API = {
     email: "", // From https://dash.cloudflare.com/profile
-    key: "",   // Global API Key from https://dash.cloudflare.com/profile
-    zone: ""   // "Zone ID" from the API section of the dashboard overview page https://dash.cloudflare.com/
+    key: "", // Global API Key from https://dash.cloudflare.com/profile
+    zone: "" // "Zone ID" from the API section of the dashboard overview page https://dash.cloudflare.com/
 };
 
 // No cache values
@@ -31,7 +31,7 @@ const DEFAULT_BYPASS_COOKIES = [
 
 const DEBUG = true;
 
-// Filtered get parameters 
+// Filtered get parameters
 const FILTER_GET = [
     // Facebook related
     'utm_source',
@@ -39,12 +39,13 @@ const FILTER_GET = [
     'utm_campaign',
     'utm_content',
     'fbclid',
-    // google related 
+    // google related
     'gclid',
     'gclsrc',
     'customer-service',
     'terms-of-service',
     '_ga',
+    'add',
     'srsltid' //new google parameter
 ];
 
@@ -54,7 +55,7 @@ const CACHE_STATUSES = [
     301
 ];
 
-//Whitelisted GET parameters 
+//Whitelisted GET parameters
 const ALLOWED_GET = [
     'product_list_order',
     'p',
@@ -64,7 +65,7 @@ const ALLOWED_GET = [
     'price'
 ];
 
-// URLs will not be cached 
+// URLs will not be cached
 const BYPASS_URL = [
     'order',
     'onestepcheckout',
@@ -89,20 +90,21 @@ const BYPASS_URL = [
     'fpc'
 ];
 
-// URL will always be cached no matter what 
+// URL will always be cached no matter what
 const CACHE_ALWAYS = [
-    //  'banner/ajax/load'
+    'customer-service',
+    'banner/ajax/load'
 ]
 
 //Some legacy stuff. Bots doesn't have it and produces cache MISSES
 const ACCEPT_CONTENT_HEADER = 'Accept';
 // Revalidate the cache every N sec
-// User will receive old/stale version 
+// User will receive old/stale version
 const REVALIDATE_AGE = 360;
 
 /**
- * Main worker entry point. 
- */
+* Main worker entry point.
+*/
 addEventListener("fetch", event => {
     console.log(event.request);
     const request0 = event.request;
@@ -115,7 +117,7 @@ addEventListener("fetch", event => {
         cacheUrl.hostname = OTHER_HOST;
     }
 
-    // Remove marketing GET parameters from the URL 
+    // Remove marketing GET parameters from the URL
     let normalUrl = normalizeUrl(cacheUrl);
 
     const request = new Request(normalUrl.toString(), request0);
@@ -159,29 +161,29 @@ addEventListener("fetch", event => {
 });
 
 /**
- * Process every request coming through to add the edge-cache header,
- * watch for purge responses and possibly cache HTML GET requests.
- * 
- * @param {Request} originalRequest - Original request
- * @param {Event} event - Original event (for additional async waiting)
- */
+* Process every request coming through to add the edge-cache header,
+* watch for purge responses and possibly cache HTML GET requests.
+*
+* @param {Request} originalRequest - Original request
+* @param {Event} event - Original event (for additional async waiting)
+*/
 async function processRequest(originalRequest, event) {
     let cfCacheStatus = null;
     const accept = originalRequest.headers.get(ACCEPT_CONTENT_HEADER);
     let isHTML = true;//(accept && accept.indexOf('text/html') >= 0);
 
     console.log("isHTML: " + isHTML);
-    //Cache everything by default 
+    //Cache everything by default
     //ToDo: exclude some mime types
     isHTML = true;
 
     let { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways } = await getCachedResponse(originalRequest, event);
 
-    // Request to purge cache by Adding Version 
+    // Request to purge cache by Adding Version
     if (originalRequest.url.indexOf('cfpurge') >= 0) {
         console.log("Clearing the cache");
         await purgeCache(cacheVer, event);
-        status += ', Purged';
+        status += ',Purged';
 
         return new Response("Cache Purged (NEW VERSION " + (cacheVer + 1) + ") Successfully!!");
     }
@@ -192,18 +194,30 @@ async function processRequest(originalRequest, event) {
         let request = new Request(originalRequest);
         request.headers.set('x-HTML-Edge-Cache', 'supports=cache|purgeall|bypass-cookies');
 
-        status += ', FetchedOrigin,';
-        response = await fetch(request);
+        status += ',FetchedOrigin,';
+        // get it from origin
+        response = await fetch(request, {
+            cf: {
+                // Always cache this fetch regardless of content type
+                // for a max of 15 seconds before revalidating the resource
+                // cacheTtl: 15,
+                // cacheEverything: true
+            },
+        });
 
-        //ToDo: Seams redundant refactor 
+        //ToDo: Seams redundant refactor
         if (response) {
+            console.log("Origin CF Cache Status: " + response.headers.get('cf-cache-status'));
+            if (response.headers.get('cf-cache-status') === "HIT") {
+                status += ',CF-HIT,';
+            }
             console.log("response from Origin ");
             const options = getResponseOptions(response);
             console.log('URL path: ' + request.url);
             if (options && options.purge) {
                 console.log("Clearing the cache");
                 await purgeCache(cacheVer, event);
-                status += ', Purged';
+                status += ',Purged,';
             }
             bypassCache = bypassCache || shouldBypassEdgeCache(request, response);
             console.log("bypassCache: " + bypassCache);
@@ -233,9 +247,9 @@ async function processRequest(originalRequest, event) {
         cfCacheStatus = 'HIT';
         console.log("Cache HIT!!!");
         console.log(response);
-        // Nen revalidate when fetched previous version 
+        // Nen revalidate when fetched previous version
         if (needsRevalidate) {
-            status += ', Stale';
+            status += ',Stale';
             console.log("Hit from the previous version Needs Revalidate: Current V: " + cacheVer + " Previous: " + (cacheVer - 1))
         }
         if (originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
@@ -248,13 +262,13 @@ async function processRequest(originalRequest, event) {
 
                     // If the cache is new, don't send the backend request
                     if (needsRevalidate || age > REVALIDATE_AGE) {
-                        status += ', Refreshed';
-                        // In service workers, waitUntil() tells the browser that work is ongoing until 
+                        status += ',Refreshed';
+                        // In service workers, waitUntil() tells the browser that work is ongoing until
                         // the promise settles, and it shouldn't terminate the service worker if it wants that work to be complete.
-                        // ToDO: optimize this stuff for better server performance by reducing backend server requests 
+                        // ToDO: optimize this stuff for better server performance by reducing backend server requests
                         event.waitUntil(updateCache(originalRequest, cacheVer, event, cacheAlways));
                     } else {
-                        status += ', Stale_' + age;
+                        status += ',Stale_' + age;
                     }
                 }
             }
@@ -277,7 +291,7 @@ async function processRequest(originalRequest, event) {
             response.headers.set('CF-Loc', btoa(cfCacheStatus));
             response.headers.set('Cache-Control', 'max-age=0, must-revalidate');
         }
-        // Hide default CF values 
+        // Hide default CF values
         if (!DEBUG && cfCacheStatus) {
             response.headers.delete('CF-Cache-Status');
             response.headers.delete('Age');
@@ -292,14 +306,14 @@ async function processRequest(originalRequest, event) {
 }
 
 /**
- * Determine if the cache should be bypassed for the given request/response pair.
- * Specifically, if the request includes a cookie that the response flags for bypass.
- * Can be used on cache lookups to determine if the request needs to go to the origin and
- * origin responses to determine if they should be written to cache.
- * @param {Request} request - Request
- * @param {Response} response - Response
- * @returns {bool} true if the cache should be bypassed
- */
+* Determine if the cache should be bypassed for the given request/response pair.
+* Specifically, if the request includes a cookie that the response flags for bypass.
+* Can be used on cache lookups to determine if the request needs to go to the origin and
+* origin responses to determine if they should be written to cache.
+* @param {Request} request - Request
+* @param {Response} response - Response
+* @returns {bool} true if the cache should be bypassed
+*/
 function shouldBypassEdgeCache(request /*, response*/) {
     let bypassCache = false;
 
@@ -358,10 +372,10 @@ function shouldBypassURL(request) {
 const CACHE_HEADERS = ['Cache-Control', 'Expires', 'Pragma'];
 
 /**
- * Check for cached HTML GET requests.
- * 
- * @param {Request} request - Original request
- */
+* Check for cached HTML GET requests.
+*
+* @param {Request} request - Original request
+*/
 async function getCachedResponse(request, event) {
     let response = null;
     let cacheVer = null;
@@ -379,25 +393,25 @@ async function getCachedResponse(request, event) {
         if (request.url.indexOf(url) >= 0) {
             console.log("Always Cache URL:" + url + " in " + request.url);
             cacheAlways = true;
-            status = 'AlwaysCache';
+            status += ',AlwaysCache,';
             break;
         }
     }
 
-    // Always cache some URLs 
+    // Always cache some URLs
     if (!cacheAlways) {
         byPassUrl = shouldBypassURL(request);
 
         // Bypass static files
         if (byPassUrl) {
-            status = 'BypassURL';
+            status += ',BypassURL,';
             console.log(status + " : " + request.url);
             bypassCache = true;
         } else {
             // Check to see if the response needs to be bypassed because of a cookie
             bypassCache = shouldBypassEdgeCache(request /*, cachedResponse*/);
             if (bypassCache)
-                status = 'BypassCookie';
+                status += ',BypassCookie,';
         }
     }
 
@@ -405,9 +419,9 @@ async function getCachedResponse(request, event) {
     let needsRevalidate = false;
 
     /*if (cacheControl && cacheControl.indexOf('no-cache') !== -1) {
-      noCache = true;
-      bypassCache =  true;
-      status = 'No-Cache';
+    noCache = true;
+    bypassCache = true;
+    status = 'No-Cache';
     }*/
 
     if (!bypassCache && !noCache && request.method === 'GET' /*&& accept && accept.indexOf('text/html') >= 0*/) {
@@ -474,7 +488,7 @@ async function getCachedResponse(request, event) {
             }
         } catch (err) {
             // Send the exception back in the response header for debugging
-            status = "Cache Read Exception: " + err.message;
+            status += ",Cache Read Exception: " + err.message + ",";
         }
     }
 
@@ -482,10 +496,10 @@ async function getCachedResponse(request, event) {
 }
 
 /**
- * Asynchronously purge the HTML cache.
- * @param {Int} cacheVer - Current cache version (if retrieved)
- * @param {Event} event - Original event
- */
+* Asynchronously purge the HTML cache.
+* @param {Int} cacheVer - Current cache version (if retrieved)
+* @param {Event} event - Original event
+*/
 async function purgeCache(cacheVer, event) {
     if (typeof EDGE_CACHE !== 'undefined') {
         // Purge the KV cache by bumping the version number
@@ -508,19 +522,20 @@ async function purgeCache(cacheVer, event) {
 }
 
 /**
- * Update the cached copy of the given page
- * @param {Request} originalRequest - Original Request
- * @param {String} cacheVer - Cache Version
- * @param {EVent} event - Original event
- */
+* Update the cached copy of the given page
+* @param {Request} originalRequest - Original Request
+* @param {String} cacheVer - Cache Version
+* @param {EVent} event - Original event
+*/
 async function updateCache(originalRequest, cacheVer, event, cacheAlways) {
     // Clone the request, add the edge-cache header and send it through.
     let request = new Request(originalRequest);
+    let status = "";
     request.headers.set('x-HTML-Edge-Cache', 'supports=cache|purgeall|bypass-cookies');
-    response = await fetch(request);
+    let response = await fetch(request);
 
     if (response) {
-        status = ': Fetched';
+        status += ',: Fetched,';
         const options = getResponseOptions(response);
         if (options && options.purge) {
             await purgeCache(cacheVer, event);
@@ -533,19 +548,19 @@ async function updateCache(originalRequest, cacheVer, event, cacheAlways) {
 }
 
 /**
- * Cache the returned content (but only if it was a successful GET request)
- * 
- * @param {Int} cacheVer - Current cache version (if already retrieved)
- * @param {Request} request - Original Request
- * @param {Response} originalResponse - Response to (maybe) cache
- * @param {Event} event - Original event
- * @returns {bool} true if the response was cached
- */
+* Cache the returned content (but only if it was a successful GET request)
+*
+* @param {Int} cacheVer - Current cache version (if already retrieved)
+* @param {Request} request - Original Request
+* @param {Response} originalResponse - Response to (maybe) cache
+* @param {Event} event - Original event
+* @returns {bool} true if the response was cached
+*/
 async function cacheResponse(cacheVer, request, originalResponse, event, cacheAlways) {
     let status = "";
     const accept = request.headers.get(ACCEPT_CONTENT_HEADER);
     console.log("ACCEPT_CONTENT_HEADER: " + accept);
-    if (request.method === 'GET' && CACHE_STATUSES.includes(originalResponse.status)  /*&& accept && accept.indexOf('text/html') >= 0*/) {
+    if (request.method === 'GET' && CACHE_STATUSES.includes(originalResponse.status) /*&& accept && accept.indexOf('text/html') >= 0*/) {
         cacheVer = await GetCurrentCacheVersion(cacheVer);
         const cacheKeyRequest = GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways);
 
@@ -577,6 +592,7 @@ async function cacheResponse(cacheVer, request, originalResponse, event, cacheAl
             event.waitUntil(cache.put(cacheKeyRequest, cdnCachedResponse));
             status += ",Saved CDN,";
 
+
         } catch (err) {
             console.log("Catch Cache Error: " + err.message);
             status += ",Cache Response Exception:" + err.message + ",";
@@ -585,15 +601,19 @@ async function cacheResponse(cacheVer, request, originalResponse, event, cacheAl
     return status;
 }
 
+async function putR2(cacheKeyRequest, respText, hedersMetadata) {
+    return await R2.put(cacheKeyRequest.url, respText, { customMetadata: hedersMetadata /* httpMetadata: response.headers*/ });
+}
+
 /******************************************************************************
- * Utility Functions
- *****************************************************************************/
+* Utility Functions
+*****************************************************************************/
 
 /**
- * Parse the commands from the x-HTML-Edge-Cache response header.
- * @param {Response} response - HTTP response from the origin.
- * @returns {*} Parsed commands
- */
+* Parse the commands from the x-HTML-Edge-Cache response header.
+* @param {Response} response - HTTP response from the origin.
+* @returns {*} Parsed commands
+*/
 function getResponseOptions(response) {
     let options = null;
     let header = response.headers.get('x-HTML-Edge-Cache');
@@ -642,10 +662,10 @@ function getResponseCacheControl(response) {
 }
 
 /**
- * Retrieve the current cache version from KV
- * @param {Int} cacheVer - Current cache version value if set.
- * @returns {Int} The current cache version.
- */
+* Retrieve the current cache version from KV
+* @param {Int} cacheVer - Current cache version value if set.
+* @returns {Int} The current cache version.
+*/
 async function GetCurrentCacheVersion(cacheVer) {
     if (cacheVer === null) {
         if (typeof EDGE_CACHE !== 'undefined') {
@@ -685,11 +705,11 @@ const getDeviceType = (userAgent) => {
 };
 
 /**
- * Generate the versioned Request object to use for cache operations.
- * @param {Request} request - Base request
- * @param {Int} cacheVer - Current Cache version (must be set)
- * @returns {Request} Versioned request object
- */
+* Generate the versioned Request object to use for cache operations.
+* @param {Request} request - Base request
+* @param {Int} cacheVer - Current Cache version (must be set)
+* @returns {Request} Versioned request object
+*/
 function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
 
     //Add additional parameters Cache Version for Logged In users
@@ -726,15 +746,15 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
             }
         }
     }
-    // if the additional param is not empty 
+    // if the additional param is not empty
     if (additionalParam.length > 2) {
-        additionalParam = '&add=' + btoa(additionalParam);
+        additionalParam = '&additional=' + btoa(additionalParam);
     }
 
     if (cacheAlways) {
         newUrl = new URL(request.url);
         for (var key of newUrl.searchParams.keys()) {
-            //console.log("Key to filter:" + key);    
+            //console.log("Key to filter:" + key);
             newUrl.searchParams.delete(key);
         }
         request = new Request(newUrl.toString(), request);
