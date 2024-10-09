@@ -2,6 +2,8 @@
 //import fetch from 'node-fetch'
 const fetch = require('node-fetch')
 
+// To run tests: npm install && npm test
+
 /**
  * CF Page rule must be applied
  * 
@@ -248,6 +250,27 @@ describe("FPC TESTS", () => {
     expect(headers.get('x-html-edge-cache-status')).toContain(status);
   });
 
+  test('Test ignored GET parameters different', async () => {
+    // Clears it not right away
+    const ignoredGET = "&add=fdgdfg&gclsrc=sfsd";
+    const url = URL + uniqueParam;
+    await new Promise((r) => setTimeout(r, 1000));
+    const response = await fetch(url + ignoredGET + "&mustbepresent=6666");
+    const headers = response.headers;
+    console.log(url);
+    console.log(response);
+    console.log(headers);
+    expect(response.status).toEqual(200);
+    expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
+    let currentVersion = headers.get('x-html-edge-cache-version')
+    expect(parseInt(currentVersion)).not.toEqual(null);
+    expect(headers.get('key')).toContain(currentVersion);
+    expect(headers.get('key')).toContain('mustbepresent');
+    expect(headers.get('key')).not.toContain(ignoredGET);
+    let status = "Hit,Stale";
+    expect(headers.get('x-html-edge-cache-status')).toContain(status);
+  });
+
   test('Test bypass URL', async () => {
     // Clears it not right away
     const bypassGET = "&ajax";
@@ -262,6 +285,5 @@ describe("FPC TESTS", () => {
     expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
     expect(headers.get('x-html-edge-cache-status')).toContain("BypassURL");
   });
-
 
 })
