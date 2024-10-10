@@ -46,13 +46,19 @@ const FILTER_GET = [
     'terms-of-service',
     '_ga',
     'add',
-    'srsltid' //new google parameter
+    'srsltid', //new google parameter
+    // worker specific
+    'cf-cdn',
+    'r2-cdn',
+    'cf-delete',
+    'cf-ttl'
 ];
 
 const CACHE_STATUSES = [
     200,
+    301,
     302,
-    301
+    404
 ];
 
 //Whitelisted GET parameters
@@ -105,11 +111,44 @@ const REVALIDATE_AGE = 360;
 /**
 * Main worker entry point.
 */
-addEventListener("fetch", event => {
+addEventListener("fetch", async event => {
+    let startWorkerTime = Date.now();
     console.log(event.request);
+    let context = {
+        event: event,
+        promise: null,
+        'CDN-miss': false, //emulate cache miss on CDN
+        'CDN-ttl': 99999999999, //ttl to test revalidation
+        'R2-miss': false, // Emulate cache miss on Page Reserve 
+        'CDN-delete': false // Delete page for test 
+    }
     const request0 = event.request;
 
     const cacheUrl = new URL(request0.url);
+
+    //Saving worker specific GET parameters to context before URL normalisation
+    if (cacheUrl.searchParams.get('cfw') === "false") {
+        console.log("bypass worker");
+        event.passThroughOnException();
+        event.respondWith(fetch(request0));
+        return true;
+    }
+    if (cacheUrl.searchParams.get('cf-cdn') === "false") {
+        context["CDN-miss"] = true;
+        cacheUrl.searchParams.delete('cf-cdn');
+    }
+    if (cacheUrl.searchParams.get('r2-cdn') === "false") {
+        context["R2-miss"] = true;
+        cacheUrl.searchParams.delete('r2-cdn');
+    }
+    if (cacheUrl.searchParams.get('cf-delete') === "true") {
+        context["CDN-delete"] = true;
+        cacheUrl.searchParams.delete('cf-delete');
+    }
+    if (cacheUrl.searchParams.get('cf-ttl')) {
+        context["CDN-ttl"] = parseInt(cacheUrl.searchParams.get('cf-ttl'));;
+        cacheUrl.searchParams.delete('cf-ttl');
+    }
 
     // Hostname for a different zone
     if (typeof OTHER_HOST !== 'undefined') {
@@ -118,9 +157,9 @@ addEventListener("fetch", event => {
     }
 
     // Remove marketing GET parameters from the URL
-    let normalUrl = normalizeUrl(cacheUrl);
+    let normalizedUrl = normalizeUrl(cacheUrl);
 
-    const request = new Request(normalUrl.toString(), request0);
+    const request = new Request(normalizedUrl.toString(), request0);
 
     console.log(request);
 
@@ -156,8 +195,12 @@ addEventListener("fetch", event => {
 
     if (configured && !isImage && upstreamCache === null) {
         event.passThroughOnException();
-        event.respondWith(processRequest(request, event));
+        let resultResponse = processRequest(request, context);
+        event.respondWith(resultResponse);
+        console.log(context);
+
     }
+
 });
 
 /**
@@ -165,10 +208,14 @@ addEventListener("fetch", event => {
 * watch for purge responses and possibly cache HTML GET requests.
 *
 * @param {Request} originalRequest - Original request
-* @param {Event} event - Original event (for additional async waiting)
+* @param {Object} context - Original event context (for additional async waiting)
 */
-async function processRequest(originalRequest, event) {
+async function processRequest(originalRequest, context) {
+    let startWorkerTime = Date.now();
+    let event = context.event;
     let cfCacheStatus = null;
+    let originTimeStart = 0;
+    let originTimeEnd = 0;
     const accept = originalRequest.headers.get(ACCEPT_CONTENT_HEADER);
     let isHTML = true;//(accept && accept.indexOf('text/html') >= 0);
 
@@ -176,16 +223,18 @@ async function processRequest(originalRequest, event) {
     //Cache everything by default
     //ToDo: exclude some mime types
     isHTML = true;
-
-    let { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways } = await getCachedResponse(originalRequest, event);
+    let getCachedTimeStart = Date.now();
+    let { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways } = await getCachedResponse(originalRequest, context);
+    let getCachedTimeEnd = Date.now();
 
     // Request to purge cache by Adding Version
-    if (originalRequest.url.indexOf('cfpurge') >= 0) {
+    if (originalRequest.url.indexOf('cf-purge') >= 0) {
         console.log("Clearing the cache");
-        await purgeCache(cacheVer, event);
-        status += ',Purged';
-
-        return new Response("Cache Purged (NEW VERSION " + (cacheVer + 1) + ") Successfully!!");
+        let newCacheVersion = await purgeCache(cacheVer, event);
+        status += ',Purged,';
+        return new Response("Cache Purged (NEW VERSION " + (cacheVer + 1) + ") Successfully!!", {
+            headers: new Headers({ 'cache-version': newCacheVersion }), status: 222
+        });
     }
 
     if (response === null) {
@@ -195,7 +244,9 @@ async function processRequest(originalRequest, event) {
         request.headers.set('x-HTML-Edge-Cache', 'supports=cache|purgeall|bypass-cookies');
 
         status += ',FetchedOrigin,';
-        // get it from origin
+        originTimeStart = Date.now();
+
+        // Fetch it from origin
         response = await fetch(request, {
             cf: {
                 // Always cache this fetch regardless of content type
@@ -204,6 +255,8 @@ async function processRequest(originalRequest, event) {
                 // cacheEverything: true
             },
         });
+        originTimeEnd = Date.now();
+        console.log("Origin-Time:" + (originTimeEnd - originTimeStart).toString());
 
         //ToDo: Seams redundant refactor
         if (response) {
@@ -229,14 +282,13 @@ async function processRequest(originalRequest, event) {
             if ((!options || options.cache) && isHTML &&
                 originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) &&
                 !bypassCache) {
-
                 console.log("Caching...");
-                status += await cacheResponse(cacheVer, originalRequest, response, event, cacheAlways);
+                status += ",Caching Async,";
+                event.waitUntil(cacheResponse(cacheVer, originalRequest, response, context, cacheAlways));
                 console.log("Status: " + status);
-
             } else {
                 console.log("Bypass The cache:" + request.url);
-                status += ", Bypassed";
+                status += ",Bypassed,";
             }
         }
     } else {
@@ -249,7 +301,7 @@ async function processRequest(originalRequest, event) {
         console.log(response);
         // Nen revalidate when fetched previous version
         if (needsRevalidate) {
-            status += ',Stale';
+            status += ',Stale,';
             console.log("Hit from the previous version Needs Revalidate: Current V: " + cacheVer + " Previous: " + (cacheVer - 1))
         }
         if (originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
@@ -257,18 +309,17 @@ async function processRequest(originalRequest, event) {
             if (needsRevalidate || !bypassCache) {
                 const options = getResponseOptions(response);
                 if (needsRevalidate || !options) {
-
-                    let age = response.headers.get('age');
-
+                    let age = parseInt(response.headers.get('age'));
                     // If the cache is new, don't send the backend request
-                    if (needsRevalidate || age > REVALIDATE_AGE) {
-                        status += ',Refreshed';
+                    if (needsRevalidate || age > context["CDN-ttl"] || age > REVALIDATE_AGE) {
+                        status += ',Refreshed,';
+                        console.log("Refresh Cache");
                         // In service workers, waitUntil() tells the browser that work is ongoing until
                         // the promise settles, and it shouldn't terminate the service worker if it wants that work to be complete.
                         // ToDO: optimize this stuff for better server performance by reducing backend server requests
                         event.waitUntil(updateCache(originalRequest, cacheVer, event, cacheAlways));
                     } else {
-                        status += ',Stale_' + age;
+                        status += ',Stale_' + age + ',';
                     }
                 }
             }
@@ -276,7 +327,18 @@ async function processRequest(originalRequest, event) {
     }
 
     if (response && status !== null && originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
-        response = new Response(response.body, response);
+        let responseBody = response.clone().body;
+        response = new Response(responseBody, response);
+        response.headers.set('Origin-Time', (originTimeEnd - originTimeStart).toString());
+        if (needsRevalidate) {
+            response.headers.set('Stale', 'true');
+        }
+        if (context['CDN-ttl'] < 9999) {
+            response.headers.set('Custom-TTL', context['CDN-ttl'].toString());
+        }
+
+        response.headers.set('Cache-Check-Time', (getCachedTimeEnd - getCachedTimeStart).toString());
+
         status = status.replaceAll(",,", ",");
         status = status.replaceAll(" ", "");
         if (DEBUG)
@@ -299,9 +361,17 @@ async function processRequest(originalRequest, event) {
             response.headers.set('X-Magento-Cache-Debug', 'MIS');
             response.headers.set('X-Varnish', Date.now() + " " + (Date.now() - 999));
         }
+        let endWorkerTime = Date.now();
+        console.log("Worker-Time: " + (endWorkerTime - startWorkerTime).toString());
+        response.headers.set("Worker-Time", (endWorkerTime - startWorkerTime).toString());
+        let jsTime = ((endWorkerTime - startWorkerTime) - (originTimeEnd - originTimeStart)).toString()
+        response.headers.set("JS-Time", jsTime);
+        console.log("JS-Time: " + jsTime);
     }
     console.log("Return Response");
     //console.log("HTML:" + await response.clone().text());
+    //console.log("HTML size:" + (await response.clone().arrayBuffer()).byteLength / 1000 + "Kb");
+
     return response;
 }
 
@@ -314,7 +384,7 @@ async function processRequest(originalRequest, event) {
 * @param {Response} response - Response
 * @returns {bool} true if the cache should be bypassed
 */
-function shouldBypassEdgeCache(request /*, response*/) {
+function shouldBypassEdgeCache(request, response) {
     let bypassCache = false;
 
     if (request /*&& response*/) {
@@ -324,10 +394,6 @@ function shouldBypassEdgeCache(request /*, response*/) {
 
         //CAHE_LOGGEDIN_USERS
 
-        //ToDo: refactor redundant
-        if (options) {
-            bypassCookies = options.bypassCookies;
-        }
         if (cookieHeader && cookieHeader.length && bypassCookies.length) {
             const cookies = cookieHeader.split(';');
             for (let cookie of cookies) {
@@ -358,14 +424,12 @@ function shouldBypassURL(request) {
             //console.log("check: " + pass);
 
             if (request.url.indexOf(pass) >= 0) {
-                // console.log("Should Bypass URL:" + pass);
+                console.log("Should Bypass URL:" + pass);
                 bypassCache = true;
                 break;
             }
-
         }
     }
-
     return bypassCache;
 }
 
@@ -375,14 +439,21 @@ const CACHE_HEADERS = ['Cache-Control', 'Expires', 'Pragma'];
 * Check for cached HTML GET requests.
 *
 * @param {Request} request - Original request
+* @param {Object} context - context container object 
 */
-async function getCachedResponse(request, event) {
+async function getCachedResponse(request, context) {
     let response = null;
+    let event = context.event;
     let cacheVer = null;
     let bypassCache = false;
     let byPassUrl = false;
     let status = '';
     let cacheAlways = false;
+    let fromR2 = false;
+    let R2check = true;
+    let R2StaleUsed = false;
+    let cachedResponse = null;
+    let staleCachePromise = null;
 
     // Only check for HTML GET requests (saves on reading from KV unnecessarily)
     // and not when there are cache-control headers on the request (refresh)
@@ -409,7 +480,7 @@ async function getCachedResponse(request, event) {
             bypassCache = true;
         } else {
             // Check to see if the response needs to be bypassed because of a cookie
-            bypassCache = shouldBypassEdgeCache(request /*, cachedResponse*/);
+            bypassCache = shouldBypassEdgeCache(request, null);
             if (bypassCache)
                 status += ',BypassCookie,';
         }
@@ -426,19 +497,47 @@ async function getCachedResponse(request, event) {
 
     if (!bypassCache && !noCache && request.method === 'GET' /*&& accept && accept.indexOf('text/html') >= 0*/) {
         // Build the versioned URL for checking the cache
-        cacheVer = await GetCurrentCacheVersion(cacheVer);
+        cacheVer = await getCurrentCacheVersion(cacheVer);
         console.log("Getting from cache:");
 
         const cacheKeyRequest = GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways);
-
+        const staleCacheKeyRequest = GenerateCacheRequestUrlKey(request, cacheVer - 1, cacheAlways);
         console.log(cacheKeyRequest);
+
         // in case of debugging uncomment this
         //status += "[" + cacheKeyRequest.url.toString() + "]";
         // See if there is a request match in the cache
         try {
             let cache = caches.default;
+            let deleted = false;
 
-            let cachedResponse = await cache.match(cacheKeyRequest);
+            // Delete page from local CDN for tests purposes 
+            // But not deleted from Cache Reserve page is still in cache 
+            if (context["CDN-delete"]) {
+                let deleteStatus = await cache.delete(cacheKeyRequest);
+                status += ",Deleted,";
+                let headers = new Headers();
+                headers.set("Deleted", "true");
+                headers.set("Delete-Status", "" + deleteStatus);
+                cachedResponse = new Response("Deleted URL: " + cacheKeyRequest.url, {
+                    headers: headers, status: 211
+                });
+                deleted = true;
+            }
+
+            if (!deleted) {
+                // check the previous version of the cache before purge and soft revalidate
+                // requestin in advance to save time 
+                staleCachePromise = cache.match(staleCacheKeyRequest);
+                cachedResponse = await cache.match(cacheKeyRequest);
+            }
+
+            let requestUrl = new URL(request.url);
+            // Bypass just CDN cache for test purpuses to imulate cache miss 
+            // like from another location/POP
+            if (context['CDN-miss']) {
+                cachedResponse = null;
+            }
             if (cachedResponse) {
                 console.log("From CDN EDGE cache");
             }
@@ -447,11 +546,8 @@ async function getCachedResponse(request, event) {
 
             // Return the previous version of the cache ...
             if (useStale && !cachedResponse) {
-                //check the previous version of the cache before purge and soft revalidate
-                const cacheKeyRequest = GenerateCacheRequestUrlKey(request, cacheVer - 1, cacheAlways);
-
                 // Trying again with the previous cache version
-                cachedResponse = await cache.match(cacheKeyRequest);
+                cachedResponse = await Promise.resolve(staleCachePromise);
                 if (cachedResponse) {
                     needsRevalidate = true;
                 }
@@ -460,19 +556,31 @@ async function getCachedResponse(request, event) {
             if (cachedResponse) {
                 // Copy Response object so that we can edit headers.
                 cachedResponse = new Response(cachedResponse.body, cachedResponse);
-
+                if (needsRevalidate) {
+                    cachedResponse.headers.set('stale-version', (cacheVer - 1).toString());
+                }
+                if (R2StaleUsed) {
+                    cachedResponse.headers.set('r2-stale', "true");
+                }
+                if (!R2StaleUsed && needsRevalidate) {
+                    cachedResponse.headers.set('cdn-stale', "true");
+                }
                 if (DEBUG)
                     cachedResponse.headers.set("Key", cacheKeyRequest.url.toString());
 
                 // ToDo: bypassCache is always false inside this IF. Refactor needed
                 // Copy the original cache headers back and clean up any control headers
 
-                status += ' Hit';
+                status += ',Hit,';
                 console.log(status);
                 cachedResponse.headers.delete('Cache-Control');
+                if (!fromR2) {
+                    cachedResponse.headers.delete('R2-Status');
+                    cachedResponse.headers.delete('R2-Time');
+                }
                 cachedResponse.headers.delete('x-HTML-Edge-Cache-Status');
 
-                for (header of CACHE_HEADERS) {
+                for (let header of CACHE_HEADERS) {
                     let value = cachedResponse.headers.get('x-HTML-Edge-Cache-Header-' + header);
                     if (value) {
                         cachedResponse.headers.delete('x-HTML-Edge-Cache-Header-' + header);
@@ -483,7 +591,7 @@ async function getCachedResponse(request, event) {
                     cachedResponse.headers.set("VARNISH", "[" + cacheKeyRequest.url.toString() + "]");
                 response = cachedResponse;
             } else {
-                status += ' Miss';
+                status += ',Miss,';
                 console.log(status);
             }
         } catch (err) {
@@ -495,6 +603,7 @@ async function getCachedResponse(request, event) {
     return { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways };
 }
 
+
 /**
 * Asynchronously purge the HTML cache.
 * @param {Int} cacheVer - Current cache version (if retrieved)
@@ -503,7 +612,7 @@ async function getCachedResponse(request, event) {
 async function purgeCache(cacheVer, event) {
     if (typeof EDGE_CACHE !== 'undefined') {
         // Purge the KV cache by bumping the version number
-        cacheVer = await GetCurrentCacheVersion(cacheVer);
+        cacheVer = await getCurrentCacheVersion(cacheVer);
         cacheVer++;
         event.waitUntil(EDGE_CACHE.put('html_cache_version', cacheVer.toString()));
     } else {
@@ -519,13 +628,14 @@ async function purgeCache(cacheVer, event) {
             body: JSON.stringify({ purge_everything: true })
         }));
     }
+    return cacheVer;
 }
 
 /**
 * Update the cached copy of the given page
 * @param {Request} originalRequest - Original Request
 * @param {String} cacheVer - Cache Version
-* @param {EVent} event - Original event
+* @param {Event} event - Original event
 */
 async function updateCache(originalRequest, cacheVer, event, cacheAlways) {
     // Clone the request, add the edge-cache header and send it through.
@@ -535,7 +645,7 @@ async function updateCache(originalRequest, cacheVer, event, cacheAlways) {
     let response = await fetch(request);
 
     if (response) {
-        status += ',: Fetched,';
+        status += ',Fetched,';
         const options = getResponseOptions(response);
         if (options && options.purge) {
             await purgeCache(cacheVer, event);
@@ -553,15 +663,16 @@ async function updateCache(originalRequest, cacheVer, event, cacheAlways) {
 * @param {Int} cacheVer - Current cache version (if already retrieved)
 * @param {Request} request - Original Request
 * @param {Response} originalResponse - Response to (maybe) cache
-* @param {Event} event - Original event
+* @param {Object} context - Original event
+* @param {boolean} cacheAlways - Cache Always Flag
 * @returns {bool} true if the response was cached
 */
-async function cacheResponse(cacheVer, request, originalResponse, event, cacheAlways) {
+async function cacheResponse(cacheVer, request, originalResponse, context, cacheAlways) {
     let status = "";
     const accept = request.headers.get(ACCEPT_CONTENT_HEADER);
     console.log("ACCEPT_CONTENT_HEADER: " + accept);
     if (request.method === 'GET' && CACHE_STATUSES.includes(originalResponse.status) /*&& accept && accept.indexOf('text/html') >= 0*/) {
-        cacheVer = await GetCurrentCacheVersion(cacheVer);
+        cacheVer = await getCurrentCacheVersion(cacheVer);
         const cacheKeyRequest = GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways);
 
         try {
@@ -570,8 +681,9 @@ async function cacheResponse(cacheVer, request, originalResponse, event, cacheAl
             // Create a new response object based on the clone that we can edit.
             let cache = caches.default;
             let clonedResponse = originalResponse.clone();
+            //originalResponse.body.cancel();
             let response = new Response(clonedResponse.body, clonedResponse);
-            for (header of CACHE_HEADERS) {
+            for (let header of CACHE_HEADERS) {
                 let value = response.headers.get(header);
                 if (value) {
                     response.headers.delete(header);
@@ -589,20 +701,19 @@ async function cacheResponse(cacheVer, request, originalResponse, event, cacheAl
             //console.log(response);
             let cdnCachedResponse = response.clone();
             cdnCachedResponse.headers.delete("R2");
-            event.waitUntil(cache.put(cacheKeyRequest, cdnCachedResponse));
+            cdnCachedResponse.headers.delete("R2-Get");
+
+            let cachePromiss = cache.put(cacheKeyRequest, cdnCachedResponse);
             status += ",Saved CDN,";
 
-
+            // Wait for cache Promise
+            await Promise.resolve(cachePromiss);
         } catch (err) {
             console.log("Catch Cache Error: " + err.message);
             status += ",Cache Response Exception:" + err.message + ",";
         }
     }
     return status;
-}
-
-async function putR2(cacheKeyRequest, respText, hedersMetadata) {
-    return await R2.put(cacheKeyRequest.url, respText, { customMetadata: hedersMetadata /* httpMetadata: response.headers*/ });
 }
 
 /******************************************************************************
@@ -666,7 +777,7 @@ function getResponseCacheControl(response) {
 * @param {Int} cacheVer - Current cache version value if set.
 * @returns {Int} The current cache version.
 */
-async function GetCurrentCacheVersion(cacheVer) {
+async function getCurrentCacheVersion(cacheVer) {
     if (cacheVer === null) {
         if (typeof EDGE_CACHE !== 'undefined') {
             cacheVer = await EDGE_CACHE.get('html_cache_version');
@@ -708,6 +819,7 @@ const getDeviceType = (userAgent) => {
 * Generate the versioned Request object to use for cache operations.
 * @param {Request} request - Base request
 * @param {Int} cacheVer - Current Cache version (must be set)
+* @param {boolean} cacheAlways - cache always flag
 * @returns {Request} Versioned request object
 */
 function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
@@ -752,9 +864,10 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
     }
 
     if (cacheAlways) {
-        newUrl = new URL(request.url);
+        let newUrl = new URL(request.url);
         for (var key of newUrl.searchParams.keys()) {
             //console.log("Key to filter:" + key);
+            // Cache Always Ignoring Any URL parameters
             newUrl.searchParams.delete(key);
         }
         request = new Request(newUrl.toString(), request);
@@ -771,14 +884,15 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
 }
 
 function normalizeUrl(url) {
-    for (var key of url.searchParams.keys()) {
-        //console.log("Key to filter:" + key);
-        for (var filter of FILTER_GET) {
-            if (filter === key) {
-                // console.log("Filtered Key:" + key);
-                url.searchParams.delete(key);
-            }
-        }
+    //   for (var key of url.searchParams.keys()) {
+    //console.log("Key to filter:" + key);
+
+    for (var filter of FILTER_GET) {
+        //  if (filter === key) {
+        // console.log("Filtered Key:" + key);
+        url.searchParams.delete(filter);
+        //    }
     }
+    // }
     return url;
 }

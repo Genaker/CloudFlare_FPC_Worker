@@ -2,6 +2,7 @@
 //import fetch from 'node-fetch'
 const fetch = require('node-fetch')
 
+// Make sure the last worker changes is deployed to the domain you are using
 // To run tests: npm install && npm test
 
 /**
@@ -11,7 +12,7 @@ const fetch = require('node-fetch')
  * 
  */
 const URL = process.env.TEST_URL;
-const uniqueParam = "?test-param=" + Date.now();
+let uniqueParam = "?test-param=" + Date.now();
 
 const DYNAMIC = "DYNAMIC";
 const HIT = "HIT";
@@ -159,6 +160,22 @@ describe("FPC TESTS", () => {
     //expect(headers.get('r2')).toEqual("true");
   }, 10000);
 
+
+  uniqueParam = "?test-param=" + Date.now();
+
+  test('Fetch New Page', async () => {
+    // Clears it not right away
+    const url = URL + uniqueParam;
+    const response = await fetch(url);
+    const headers = response.headers;
+    console.log(url);
+    console.log(response);
+    console.log(headers);
+    expect(response.status).toEqual(200);
+    expect(headers.get('cf-cache-status')).toEqual(HIT);
+    await new Promise((r) => setTimeout(r, 10000));
+  });
+
   let previousCacheVersion = null;
   test('Change Version', async () => {
     // Clears it not right away
@@ -177,7 +194,8 @@ describe("FPC TESTS", () => {
   test('Fetch after Change Version', async () => {
     // Clears it not right away
     const url = URL + uniqueParam;
-    await new Promise((r) => setTimeout(r, 1000));
+    //Backend Revalidation happens slow 
+    await new Promise((r) => setTimeout(r, 5000));
     const response = await fetch(url);
     const headers = response.headers;
     console.log(url);
@@ -192,10 +210,10 @@ describe("FPC TESTS", () => {
     expect(parseInt(headers.get('stale-version'))).toEqual(parseInt(currentVersion) - 1);
   });
 
-  test('Fetch after Change Version #2', async () => {
+  test('Fetch second time after Change Version #2', async () => {
     // Clears it not right away
     const url = URL + uniqueParam;
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 8000));
     const response = await fetch(url);
     const headers = response.headers;
     console.log(url);
@@ -283,6 +301,101 @@ describe("FPC TESTS", () => {
     expect(response.status).toEqual(200);
     expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
     expect(headers.get('x-html-edge-cache-status')).toContain("BypassURL");
+  });
+
+  test('Test bypass and ignore parameters in URL', async () => {
+    // Clears it not right away
+    const bypassGET = "&ajax=123&gclsrc=123";
+    const url = URL + uniqueParam;
+    await new Promise((r) => setTimeout(r, 1000));
+    const response = await fetch(url + bypassGET);
+    const headers = response.headers;
+    console.log(url);
+    console.log(response);
+    console.log(headers);
+    expect(response.status).toEqual(200);
+    expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
+    expect(headers.get('x-html-edge-cache-status')).toContain("BypassURL");
+  });
+
+  describe("ASYNC revalidation Logic", () => {
+  test('Revalidate Logic ', async () => {
+    let localUniqueValue =  Date.now();
+   
+    // TTL set to 1 after 2 second delay it must be revalidated
+    let GET = "&sfsdfsd=" + localUniqueValue + "&add=123";
+    const url = URL + uniqueParam;
+    //warm up cache
+    let response = await fetch(url + GET);
+    let headers = response.headers;
+    console.log(url + GET);
+    console.log(response);
+    console.log(headers);
+    expect(response.status).toEqual(200);
+    expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
+    expect(headers.get('x-html-edge-cache-status')).toContain("Miss,FetchedOrigin,CachingAsync");
+
+    GET = "&sfsdfsd=" + localUniqueValue + "&add=123&cf-ttl=1";
+    //Wait 12 Seconds
+    await new Promise((r) => setTimeout(r, 12000));
+    response = await fetch(url + GET);
+    headers = response.headers;
+    console.log(url + GET);
+    console.log(response);
+    console.log(headers);
+    expect(response.status).toEqual(200);
+    expect(headers.get('cf-cache-status')).toEqual(HIT);
+    let status = "Hit,Refreshed";
+    expect(headers.get('x-html-edge-cache-status')).toContain(status);
+    expect(headers.get('custom-ttl')).toContain("1");
+   
+    // Check if R2 is updates Age must be around delay time less than 10
+    await new Promise((r) => setTimeout(r, 8000));
+    response = await fetch(url + GET + "&cf-cdn=false");
+    headers = response.headers;
+    console.log(url + GET);
+    console.log(response);
+    console.log(headers);
+    expect(response.status).toEqual(200);
+    expect(headers.get('cf-cache-status')).toEqual(HIT);
+    expect(parseInt(headers.get('age'))).toBeLessThan(10);
+    expect(headers.get('x-html-edge-cache-status')).toContain("FromR2");
+    expect(headers.get('r2')).toEqual("true");
+  });
+});
+
+  describe("Test R2 Stale ", () => {
+    let previousCacheVersion = null;
+    test('Change Version', async () => {
+      // Clears it not right away
+      const changeVersionPurgeParameter = "&cf-purge=true"
+      const url = URL + uniqueParam;
+      const response = await fetch(url + changeVersionPurgeParameter);
+      const headers = response.headers;
+      console.log(url);
+      console.log(response);
+      console.log(headers);
+      expect(response.status).toEqual(222);
+      expect(headers.get('Cache-Version')).not.toEqual(null);
+      previousCacheVersion = parseInt(headers.get('Cache-Version')) - 1;
+    });
+
+    test('Fetch Change Version without CDN', async () => {
+
+      const changeVersionPurgeParameter = "&cf-cdn=false"
+      const url = URL + uniqueParam;
+      const response = await fetch(url + changeVersionPurgeParameter);
+      const headers = response.headers;
+      console.log(url);
+      console.log(response);
+      console.log(headers);
+      expect(response.status).toEqual(200);
+      expect(headers.get('r2')).toEqual("true");
+      expect(headers.get('r2-cache-version')).toEqual(previousCacheVersion.toString());
+      expect(headers.get('cf-cache-status')).toEqual(HIT);
+      
+      //expect(headers.get('R2-stale')).toEqual("true");
+    });
   });
 
 })
