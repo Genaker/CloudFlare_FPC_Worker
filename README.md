@@ -10,6 +10,12 @@ The Edge Worker Magento full-page cache feature helps you optimize eCommerce per
 
 # Integration Jest tests
 All functionality is covered with the Jest integration tests. You can test your website and you rule as well. 
+Running the test:
+```
+export TEST_URL="https://******.com/"
+npm install
+npm test
+```
 
 CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if a cached version of the requested content is available in the CloudFlare locations or in the cache Reserve. This check for the cached version can have the following outcomes, depending on its state:
 

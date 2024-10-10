@@ -117,6 +117,7 @@ addEventListener("fetch", async event => {
     let context = {
         event: event,
         promise: null,
+        'r2-stale': false,
         'CDN-miss': false, //emulate cache miss on CDN
         'CDN-ttl': 99999999999, //ttl to test revalidation
         'R2-miss': false, // Emulate cache miss on Page Reserve 
@@ -141,11 +142,11 @@ addEventListener("fetch", async event => {
         context["R2-miss"] = true;
         cacheUrl.searchParams.delete('r2-cdn');
     }
-    if (cacheUrl.searchParams.get('cf-delete') === "true") {
+    if(cacheUrl.searchParams.get('cf-delete') === "true"){
         context["CDN-delete"] = true;
         cacheUrl.searchParams.delete('cf-delete');
     }
-    if (cacheUrl.searchParams.get('cf-ttl')) {
+    if(cacheUrl.searchParams.get('cf-ttl')){
         context["CDN-ttl"] = parseInt(cacheUrl.searchParams.get('cf-ttl'));;
         cacheUrl.searchParams.delete('cf-ttl');
     }
@@ -233,8 +234,7 @@ async function processRequest(originalRequest, context) {
         let newCacheVersion = await purgeCache(cacheVer, event);
         status += ',Purged,';
         return new Response("Cache Purged (NEW VERSION " + (cacheVer + 1) + ") Successfully!!", {
-            headers: new Headers({ 'cache-version': newCacheVersion }), status: 222
-        });
+            headers: new Headers({'cache-version': newCacheVersion}), status: 222});
     }
 
     if (response === null) {
@@ -333,7 +333,7 @@ async function processRequest(originalRequest, context) {
         if (needsRevalidate) {
             response.headers.set('Stale', 'true');
         }
-        if (context['CDN-ttl'] < 9999) {
+        if (context['CDN-ttl'] < 9999){
             response.headers.set('Custom-TTL', context['CDN-ttl'].toString());
         }
 
@@ -360,6 +360,9 @@ async function processRequest(originalRequest, context) {
             response.headers.set('CF-Cache-Status', 'DYNAMIC');
             response.headers.set('X-Magento-Cache-Debug', 'MIS');
             response.headers.set('X-Varnish', Date.now() + " " + (Date.now() - 999));
+        }
+        if(context['r2-stale']) {
+            response.headers.set('R2-stale', "true");
         }
         let endWorkerTime = Date.now();
         console.log("Worker-Time: " + (endWorkerTime - startWorkerTime).toString());
@@ -513,7 +516,7 @@ async function getCachedResponse(request, context) {
 
             // Delete page from local CDN for tests purposes 
             // But not deleted from Cache Reserve page is still in cache 
-            if (context["CDN-delete"]) {
+            if(context["CDN-delete"]) {
                 let deleteStatus = await cache.delete(cacheKeyRequest);
                 status += ",Deleted,";
                 let headers = new Headers();
@@ -525,11 +528,16 @@ async function getCachedResponse(request, context) {
                 deleted = true;
             }
 
-            if (!deleted) {
+            if(!deleted){
                 // check the previous version of the cache before purge and soft revalidate
                 // requestin in advance to save time 
                 staleCachePromise = cache.match(staleCacheKeyRequest);
                 cachedResponse = await cache.match(cacheKeyRequest);
+                if (!cachedResponse) {
+                    // Return the previous version of the cache ...
+                    cachedResponse = await Promise.resolve(staleCachePromise);
+                    needsRevalidate = true;
+                }
             }
 
             let requestUrl = new URL(request.url);
@@ -537,34 +545,27 @@ async function getCachedResponse(request, context) {
             // like from another location/POP
             if (context['CDN-miss']) {
                 cachedResponse = null;
+                staleCachePromise = null;
             }
             if (cachedResponse) {
                 console.log("From CDN EDGE cache");
             }
 
-            let useStale = true;
-
-            // Return the previous version of the cache ...
-            if (useStale && !cachedResponse) {
-                // Trying again with the previous cache version
-                cachedResponse = await Promise.resolve(staleCachePromise);
-                if (cachedResponse) {
-                    needsRevalidate = true;
-                }
-            }
+            let useStale = true;       
 
             if (cachedResponse) {
                 // Copy Response object so that we can edit headers.
                 cachedResponse = new Response(cachedResponse.body, cachedResponse);
-                if (needsRevalidate) {
+                if(needsRevalidate) {
                     cachedResponse.headers.set('stale-version', (cacheVer - 1).toString());
                 }
-                if (R2StaleUsed) {
+                if(R2StaleUsed) {
                     cachedResponse.headers.set('r2-stale', "true");
-                }
-                if (!R2StaleUsed && needsRevalidate) {
+                    context['r2-stale'] = true;
+                } 
+                if(!R2StaleUsed && needsRevalidate) {
                     cachedResponse.headers.set('cdn-stale', "true");
-                }
+                } 
                 if (DEBUG)
                     cachedResponse.headers.set("Key", cacheKeyRequest.url.toString());
 
@@ -705,6 +706,7 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
 
             let cachePromiss = cache.put(cacheKeyRequest, cdnCachedResponse);
             status += ",Saved CDN,";
+            context.version = cacheVer.toString();
 
             // Wait for cache Promise
             await Promise.resolve(cachePromiss);
@@ -715,6 +717,7 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
     }
     return status;
 }
+
 
 /******************************************************************************
 * Utility Functions
@@ -884,15 +887,15 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
 }
 
 function normalizeUrl(url) {
-    //   for (var key of url.searchParams.keys()) {
-    //console.log("Key to filter:" + key);
+ //   for (var key of url.searchParams.keys()) {
+        //console.log("Key to filter:" + key);
 
-    for (var filter of FILTER_GET) {
-        //  if (filter === key) {
-        // console.log("Filtered Key:" + key);
-        url.searchParams.delete(filter);
+        for (var filter of FILTER_GET) {
+          //  if (filter === key) {
+                // console.log("Filtered Key:" + key);
+                url.searchParams.delete(filter);
         //    }
-    }
-    // }
+        }
+   // }
     return url;
 }
