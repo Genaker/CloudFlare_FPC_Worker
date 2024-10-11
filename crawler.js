@@ -23,6 +23,9 @@ crawler.crawl(URL,
     function onSuccess(page) {
         console.log(page.url);
         urlsCrawledCount++;
+        if(urlsCrawledCount % 100 === 0) {
+            console.log("Crawled: " + urlsCrawledCount);
+        }
     },
     function onFailure(page) {
         console.log("ERROR Fetch(" + page.url + ") status = " + page.status);
