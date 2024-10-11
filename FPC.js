@@ -1,5 +1,5 @@
 // IMPORTANT: Either A Key/Value Namespace must be bound to this worker script
-// using the variable name EDGE_CACHE. or the API parameters below should be
+// using the variable name KV. or the API parameters below should be
 // configured. KV is recommended if possible since it can purge just the HTML
 // instead of the full cache.
 
@@ -175,14 +175,15 @@ addEventListener("fetch", async event => {
         console.log('R2 is working!!');
     } else {
         console.log('R2 is not working!!');
-        const R2 = false;
     }
 
-    if (typeof EDGE_CACHE !== 'undefined') {
+    if (typeof KV !== 'undefined') {
         console.log('KV is working!!');
         configured = true;
     } else if (CLOUDFLARE_API.email.length && CLOUDFLARE_API.key.length && CLOUDFLARE_API.zone.length) {
         configured = true;
+    } else {
+        throw Error("KV is not configured");
     }
     // temporary
     configured = true;
@@ -604,18 +605,17 @@ async function getCachedResponse(request, context) {
     return { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways };
 }
 
-
 /**
 * Asynchronously purge the HTML cache.
 * @param {Int} cacheVer - Current cache version (if retrieved)
 * @param {Event} event - Original event
 */
 async function purgeCache(cacheVer, event) {
-    if (typeof EDGE_CACHE !== 'undefined') {
+    if (typeof KV !== 'undefined') {
         // Purge the KV cache by bumping the version number
         cacheVer = await getCurrentCacheVersion(cacheVer);
         cacheVer++;
-        event.waitUntil(EDGE_CACHE.put('html_cache_version', cacheVer.toString()));
+        event.waitUntil(KV.put('html_cache_version', cacheVer.toString()));
     } else {
         // Purge everything using the API
         const url = "https://api.cloudflare.com/client/v4/zones/" + CLOUDFLARE_API.zone + "/purge_cache";
@@ -718,7 +718,6 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
     return status;
 }
 
-
 /******************************************************************************
 * Utility Functions
 *****************************************************************************/
@@ -782,15 +781,15 @@ function getResponseCacheControl(response) {
 */
 async function getCurrentCacheVersion(cacheVer) {
     if (cacheVer === null) {
-        if (typeof EDGE_CACHE !== 'undefined') {
-            cacheVer = await EDGE_CACHE.get('html_cache_version');
+        if (typeof KV !== 'undefined') {
+            cacheVer = await KV.get('html_cache_version');
 
             if (cacheVer === null || cacheVer > 1000) {
                 // 1000 is overflow protection
                 // Uninitialized - first time through, initialize KV with a value
                 // Blocking but should only happen immediately after worker activation.
                 cacheVer = 0;
-                await EDGE_CACHE.put('html_cache_version', cacheVer.toString());
+                await KV.put('html_cache_version', cacheVer.toString());
             } else {
                 cacheVer = parseInt(cacheVer);
             }
@@ -887,15 +886,8 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
 }
 
 function normalizeUrl(url) {
- //   for (var key of url.searchParams.keys()) {
-        //console.log("Key to filter:" + key);
-
-        for (var filter of FILTER_GET) {
-          //  if (filter === key) {
-                // console.log("Filtered Key:" + key);
+        for (var filter of FILTER_GET) {        
                 url.searchParams.delete(filter);
-        //    }
         }
-   // }
     return url;
 }
