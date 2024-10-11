@@ -17,6 +17,12 @@ npm install
 npm test
 ```
 
+# Crawler to generate static HTML objects 
+Run next command
+```
+node crawler
+```
+
 CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if a cached version of the requested content is available in the CloudFlare locations or in the cache Reserve. This check for the cached version can have the following outcomes, depending on its state:
 
  - If a cached version is found and it's not stale, then the cached content is served to the user. No request is made to the Magento Server.
