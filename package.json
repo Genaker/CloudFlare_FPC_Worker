@@ -5,6 +5,7 @@
   "main": "FPC.js",
   "type": "module",
   "scripts": {
+    "crawler" : "node crawler.js",
     "test": "jest"
   },
   "repository": {
@@ -29,6 +30,7 @@
     "jest": "^29.7.0"
   },
   "dependencies": {
+    "js-crawler": "^0.3.21",
     "node-fetch": "^2.7.0"
   }
 }
