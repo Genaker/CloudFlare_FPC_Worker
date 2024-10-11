@@ -38,7 +38,7 @@ describe("FPC TESTS", () => {
   test('Repeated Requests Test', async () => {
     const url = URL + uniqueParam;
     let response = await fetch(url);
-    await new Promise((r) => setTimeout(r, 3000));
+    await new Promise((r) => setTimeout(r, 1000));
     response = await fetch(url);
     response = await fetch(url);
     const headers = response.headers;
@@ -137,7 +137,7 @@ describe("FPC TESTS", () => {
     const url = URL + uniqueParam;
     let response = await fetch(url + deleteFromCDN);
     const headers = response.headers;
-    console.log(url);
+    console.log(url  + deleteFromCDN);
     console.log(response);
     console.log(headers);
     const cacheVersion = parseInt(headers.get('x-html-edge-cache-version'));
@@ -148,8 +148,8 @@ describe("FPC TESTS", () => {
   });
 
   test('Fetch after Delete', async () => {
-    // Clears it not right away
-    await new Promise((r) => setTimeout(r, 2000));
+    // CF Clears it not right away
+    await new Promise((r) => setTimeout(r, 5000));
     const url = URL + uniqueParam;
     const response = await fetch(url);
     const headers = response.headers;
@@ -157,10 +157,11 @@ describe("FPC TESTS", () => {
     console.log(response);
     console.log(headers);
     expect(headers.get('cf-cache-status')).toEqual(HIT);
-    // This rule works randomly ->
-    //expect(headers.get('r2')).toEqual("true");
+    // ToDO: This rule works randomly ->
+    // expect(headers.get('r2')).toEqual("true");
   });
 
+ 
 
   uniqueParam = "?test-param=" + Date.now();
 
@@ -174,7 +175,7 @@ describe("FPC TESTS", () => {
     console.log(headers);
     expect(response.status).toEqual(200);
     expect(headers.get('cf-cache-status')).toEqual(HIT);
-    await new Promise((r) => setTimeout(r, 10000));
+
   });
 
   let previousCacheVersion = null;
@@ -196,7 +197,7 @@ describe("FPC TESTS", () => {
     // Clears it not right away
     const url = URL + uniqueParam;
     //Backend Revalidation happens slow 
-    await new Promise((r) => setTimeout(r, 5000));
+    await new Promise((r) => setTimeout(r, 1000));
     const response = await fetch(url);
     const headers = response.headers;
     console.log(url);
@@ -214,7 +215,7 @@ describe("FPC TESTS", () => {
   test('Fetch second time after Change Version #2', async () => {
     // Clears it not right away
     const url = URL + uniqueParam;
-    await new Promise((r) => setTimeout(r, 8000));
+    await new Promise((r) => setTimeout(r, 2000));
     const response = await fetch(url);
     const headers = response.headers;
     console.log(url);
@@ -346,7 +347,7 @@ describe("ASYNC revalidation Logic", () => {
   test("Fetch with expired AGE", async () => {
     GET = "&sfsdfsd=" + localUniqueValue + "&add=123&cf-ttl=1";
     //Wait 12 Seconds
-    await new Promise((r) => setTimeout(r, 12000));
+    await new Promise((r) => setTimeout(r, 5000));
     response = await fetch(url + GET);
     headers = response.headers;
     console.log(url + GET);
@@ -360,7 +361,7 @@ describe("ASYNC revalidation Logic", () => {
   });
   test("Fetch Without CDN ", async () => {
     // Check if R2 is updates Age must be around delay time less than 10
-    await new Promise((r) => setTimeout(r, 8000));
+    await new Promise((r) => setTimeout(r, 6000));
     response = await fetch(url + GET + "&cf-cdn=false");
     headers = response.headers;
     console.log(url + GET);
@@ -389,8 +390,6 @@ describe("Test R2 Stale", () => {
     expect(response.status).toEqual(200);
     expect(headers.get('x-html-edge-cache-status')).toContain("Miss,FetchedOrigin,CachingAsync");
     expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
-    // Big delays required to save data async 
-    await new Promise((r) => setTimeout(r, 2000));
   });
 
   test('Change Version', async () => {
@@ -411,7 +410,7 @@ describe("Test R2 Stale", () => {
   test('Fetch Changed Version without CDN', async () => {
     const cdnMissParameter = "&cf-cdn=false"
     const url = URL + uniqueParam;
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 1000));
     const response = await fetch(url + cdnMissParameter);
     const headers = response.headers;
     console.log(url);
@@ -434,7 +433,7 @@ describe("Test R2 Stale", () => {
   test('Fetch Changed Version without CDN #2 revalidated', async () => {
     const changeVersionPurgeParameter = "&cf-cdn=false"
     const url = URL + uniqueParam;
-    await new Promise((r) => setTimeout(r, 10000));
+    await new Promise((r) => setTimeout(r, 6000));
     const response = await fetch(url + changeVersionPurgeParameter);
     const headers = response.headers;
     console.log(url);
