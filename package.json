@@ -5,7 +5,7 @@
   "main": "FPC.js",
   "type": "module",
   "scripts": {
-    "generate" : "node crawler.js",
+    "generate": "node crawler.js",
     "test": "jest"
   },
   "repository": {
