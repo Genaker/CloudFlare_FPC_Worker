@@ -1,4 +1,5 @@
 
+// To run the tests set: export TEST_URL="http://site.com/" and run: npm test
 //import fetch from 'node-fetch'
 const fetch = require('node-fetch')
 
@@ -437,6 +438,7 @@ describe("Test R2 Stale", () => {
     const response = await fetch(url + changeVersionPurgeParameter);
     const headers = response.headers;
     console.log(url);
+
     console.log(response);
     console.log(headers);
     expect(response.status).toEqual(200);

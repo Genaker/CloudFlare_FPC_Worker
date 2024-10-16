@@ -1,6 +1,7 @@
 import Crawler from "js-crawler";
 
-const URL = process.env.TEST_URL;
+// set in terminal: export URL="https://XXXXX.com/"
+const URL = process.env.URL;
 
 let urlsCrawledCount = 0;
 
@@ -24,7 +25,7 @@ crawler.crawl(URL,
         console.log(page.url);
         urlsCrawledCount++;
         if(urlsCrawledCount % 100 === 0) {
-            console.log("Crawled: " + urlsCrawledCount);
+            console.log("Generated: " + urlsCrawledCount);
         }
     },
     function onFailure(page) {
@@ -32,7 +33,7 @@ crawler.crawl(URL,
         urlsCrawledCount++;
     },
     function onAllFinished(crawledUrls) {
-        console.log('All crawling finished');
-        console.log('Urls crawled = ' + urlsCrawledCount);
+        console.log('All generating finished');
+        console.log('Urls generated = ' + urlsCrawledCount);
     }
 );
