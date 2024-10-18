@@ -1,4 +1,4 @@
-# CloudFlare Worker FPC
+![image](https://github.com/user-attachments/assets/a359069a-3da4-48d1-9bc1-0cb7bc7ca347)# CloudFlare Worker FPC
 CloudFlare(CF) CDN Worker Full Page Cache(FPC) Layer for Magento 2.
 It has become true. Now, it is Open Source and free. 
 The original idea was the Shopify FPC cache from the CloudFlare CDN, AWS Cloud Front Lambda Edge S3 Buket, etc and it was part of our true Magento SaaS solution(Magneto)
@@ -17,10 +17,10 @@ npm install
 npm test
 ```
 
-# Crawler to generate static HTML objects 
+# Generate static HTML objects 
 Run next command
 ```
-node crawler
+node generate.js
 ```
 
 CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if a cached version of the requested content is available in the CloudFlare locations or in the cache Reserve. This check for the cached version can have the following outcomes, depending on its state:
@@ -30,6 +30,13 @@ CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if
  - If a cached version isn't found, the CF FPC worker sends a request to the Magento server to be used for future requests.
 
 CF Worker “softpurge” the cache by changing cache Version stored in the KV(Key Value)storage. Cloud flare serve the stale content untill it will not be updayed asynchronously (in the background) fetches the new page. Cloud Front ignores any cache rules from Magento and has own logic which serve web pages from the CDN cache even if Magento 2 website is broken. 
+
+# Speculative Rules
+Speculation is added to the worker response.
+
+To Debug speculative rules, go to Dev Tol Bar -> Application -> Speculative Load -> Speculation:
+![image](https://github.com/user-attachments/assets/9a14a6fe-9f5b-490d-a78e-a85d8d1eae40)
+
 
 # Caching criteria
 For CF FPC Worker to consider a response from a Magento backend as cacheable, the response must meet the following criteria:
@@ -44,6 +51,11 @@ For CF FPC Worker to consider a response from a Magento backend as cacheable, th
 - Traffic filtering and control
 - Cache logic adjustment. You don't need any VCL now you can do everething in pure JavaScript
 - Content manipulation
+- Speculation rules prerender and prefetch
+- Link header resource preload
+- Custom CORS
+- ESI (Edge Server Incluse - AJAX requests) blocks with auth and HTTPS support. Easy to use with microservices.
+- GOD MOD - cache can't be invalidated. It can be but not easy. 
 
 # Worker and CF cache limitations:
  - The full-page cache is designed to work with the default magento cache, which is PHP Built-in FPC, FAST FPC (See repo: https://github.com/Genaker/FastFPC), or Varnish. You can try to use it as a main cache (see Cache Reserve), but it is not what it was designed for. ***The main idea of the CF Worker FPC Cache is Magento 2 pages are always served from the CF cache with async revalidation.**
