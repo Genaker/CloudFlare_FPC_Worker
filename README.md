@@ -1,6 +1,6 @@
 CloudFlare(CF) CDN Worker Full Page Cache(FPC) Layer for Magento 2.
 It has become true. Now, it is Open Source and free. 
-The original idea was the Shopify FPC cache from the CloudFlare CDN, AWS Cloud Front Lambda Edge S3 Buket, etc and it was part of our true Magento SaaS solution(Magneto)
+The original idea was the Shopify FPC cache from the CloudFlare CDN, AWS Cloud Front Lambda Edge S3 Buket, Akamai EdgeWorkers with Object Storage etc. and it is a part of our true Magento SaaS solution(Magneto)
 
 ![image](https://github.com/user-attachments/assets/1dcb535e-3d0d-4e0a-b399-9f331807420d)
 
