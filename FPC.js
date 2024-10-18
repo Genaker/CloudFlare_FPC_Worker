@@ -45,6 +45,7 @@ const FILTER_GET = [
     'customer-service',
     'terms-of-service',
     '_ga',
+    '_gl',
     'add',
     'srsltid', //new google parameter
     // worker specific
@@ -102,6 +103,48 @@ const CACHE_ALWAYS = [
     'banner/ajax/load'
 ]
 
+const CUSTOM_CORS = [
+
+];
+
+const CUSTOM_PRELOAD = [
+    "<https://fonts.gstatic.com>; rel=preconnect",
+    //Link: </style.css>; rel=preload; as=style
+    //Link: </script.js>; rel=preload; as=script
+];
+
+const CUSTOM_SPECULATION = {
+    'prefetch': [{ //prerender - is not recommended
+        'source': 'document',
+        'where': {
+            'and': [
+                { 'href_matches': '/*' },
+                { 'not': { 'selector_matches': ['.action', '.skip-prerender', '.skip-prefetch'] } },
+                { 'not': { 'selector_matches': '[rel~=nofollow]' } },
+                {
+                    'not': {
+                        'href_matches': [
+                            'checkout',
+                            'customer',
+                            'search',
+                            'catalogsearch',
+                            'product_compare',
+                            'wishlist'
+                        ]
+                    }
+                }
+            ]
+        },
+        // Moderete is the best other one generate too much trafic on worker. and could increase $
+        'eagerness': 'moderate' // moderate, eager
+    }]
+};
+
+const SPECULATION_ENABLED = true;
+const SPECULATION_CHAHED_ONLY = true;
+
+const ENABLE_ESI_BLOCKS = false;
+
 //Some legacy stuff. Bots doesn't have it and produces cache MISSES
 const ACCEPT_CONTENT_HEADER = 'Accept';
 // Revalidate the cache every N sec
@@ -121,19 +164,31 @@ addEventListener("fetch", async event => {
         'CDN-miss': false, //emulate cache miss on CDN
         'CDN-ttl': 99999999999, //ttl to test revalidation
         'R2-miss': false, // Emulate cache miss on Page Reserve 
-        'CDN-delete': false // Delete page for test 
+        'CDN-delete': false, // Delete page for test 
+        'set-version': "",
+        'speculation': false
     }
     const request0 = event.request;
 
     const cacheUrl = new URL(request0.url);
 
-    //Saving worker specific GET parameters to context before URL normalisation
+    // Saving worker specific GET parameters to context before URL normalisation
     if (cacheUrl.searchParams.get('cfw') === "false") {
         console.log("bypass worker");
         event.passThroughOnException();
         event.respondWith(fetch(request0));
         return true;
     }
+    // Speculation rule Controller ;)
+    if (cacheUrl.toString().indexOf('rules/speculation.json') >= 0) {
+        console.log("Speculation Rule");
+        event.passThroughOnException();
+        event.respondWith(new Response(JSON.stringify(CUSTOM_SPECULATION), {
+            headers: new Headers({ 'Content-Type': 'application/speculationrules+json' }), status: 200
+        }));
+        return true;
+    }
+
     if (cacheUrl.searchParams.get('cf-cdn') === "false") {
         context["CDN-miss"] = true;
         cacheUrl.searchParams.delete('cf-cdn');
@@ -142,11 +197,15 @@ addEventListener("fetch", async event => {
         context["R2-miss"] = true;
         cacheUrl.searchParams.delete('r2-cdn');
     }
-    if(cacheUrl.searchParams.get('cf-delete') === "true"){
+    if (cacheUrl.searchParams.get('cf-version') !== null) {
+        context["set-version"] = cacheUrl.searchParams.get('cf-version');
+        cacheUrl.searchParams.delete('set-version');
+    }
+    if (cacheUrl.searchParams.get('cf-delete') === "true") {
         context["CDN-delete"] = true;
         cacheUrl.searchParams.delete('cf-delete');
     }
-    if(cacheUrl.searchParams.get('cf-ttl')){
+    if (cacheUrl.searchParams.get('cf-ttl')) {
         context["CDN-ttl"] = parseInt(cacheUrl.searchParams.get('cf-ttl'));;
         cacheUrl.searchParams.delete('cf-ttl');
     }
@@ -165,6 +224,10 @@ addEventListener("fetch", async event => {
     console.log(request);
 
     let upstreamCache = request.headers.get('x-HTML-Edge-Cache');
+    let specalationRequest = request.headers.get('Sec-Purpose');
+    if (specalationRequest) {
+        context['speculation'] = true;
+    }
 
     // Only process requests if KV store is set up and there is no
     // HTML edge cache in front of this worker (only the outermost cache
@@ -200,9 +263,7 @@ addEventListener("fetch", async event => {
         let resultResponse = processRequest(request, context);
         event.respondWith(resultResponse);
         console.log(context);
-
     }
-
 });
 
 /**
@@ -235,10 +296,30 @@ async function processRequest(originalRequest, context) {
         let newCacheVersion = await purgeCache(cacheVer, event);
         status += ',Purged,';
         return new Response("Cache Purged (NEW VERSION " + (cacheVer + 1) + ") Successfully!!", {
-            headers: new Headers({'cache-version': newCacheVersion}), status: 222});
+            headers: new Headers({ 'cache-version': newCacheVersion }), status: 222
+        });
+    }
+
+    // Restore version after test.
+    if (context['set-version'] !== "") {
+        console.log("set-version");
+        if (isNaN(context['set-version'])) {
+            return new Response("(NEW VERSION " + context['set-version'] + ") Set Error NaN!!", {
+                headers: new Headers({ 'cache-version': context['set-version'] }), status: 553
+            });
+        }
+        await KV.put('html_cache_version', context['set-version']);
+        let newCacheVersion = context['set-version'];
+        return new Response("(NEW VERSION " + newCacheVersion + ") Set Successfully!!", {
+            headers: new Headers({ 'cache-version': newCacheVersion }), status: 223
+        });
     }
 
     if (response === null) {
+        if (context['speculation'] === true && SPECULATION_CHAHED_ONLY) {
+            return new Response("Specualtion only from the CDN cache", { headers: new Headers({ "Cache-Control": "no-store,private" }), status: 406 });
+        }
+
         console.log("Not From Cache");
         // Clone the request, add the edge-cache header and send it through.
         let request = new Request(originalRequest);
@@ -258,7 +339,9 @@ async function processRequest(originalRequest, context) {
         });
         originTimeEnd = Date.now();
         console.log("Origin-Time:" + (originTimeEnd - originTimeStart).toString());
-
+        if (ENABLE_ESI_BLOCKS) {
+            let newBody = await processESI(response.clone(), context);
+        }
         //ToDo: Seams redundant refactor
         if (response) {
             console.log("Origin CF Cache Status: " + response.headers.get('cf-cache-status'));
@@ -334,7 +417,7 @@ async function processRequest(originalRequest, context) {
         if (needsRevalidate) {
             response.headers.set('Stale', 'true');
         }
-        if (context['CDN-ttl'] < 9999){
+        if (context['CDN-ttl'] < 9999) {
             response.headers.set('Custom-TTL', context['CDN-ttl'].toString());
         }
 
@@ -362,7 +445,7 @@ async function processRequest(originalRequest, context) {
             response.headers.set('X-Magento-Cache-Debug', 'MIS');
             response.headers.set('X-Varnish', Date.now() + " " + (Date.now() - 999));
         }
-        if(context['r2-stale']) {
+        if (context['r2-stale']) {
             response.headers.set('R2-stale', "true");
         }
         let endWorkerTime = Date.now();
@@ -375,6 +458,14 @@ async function processRequest(originalRequest, context) {
     console.log("Return Response");
     //console.log("HTML:" + await response.clone().text());
     //console.log("HTML size:" + (await response.clone().arrayBuffer()).byteLength / 1000 + "Kb");
+    if (CUSTOM_PRELOAD.length != 0) {
+        CUSTOM_PRELOAD.forEach((preload) => {
+            response.headers.set("Link", preload);
+        })
+    }
+    if (SPECULATION_ENABLED && !bypassCache) {
+        response.headers.set("Speculation-Rules", "\"/rules/speculation.json\"");
+    }
 
     return response;
 }
@@ -517,7 +608,7 @@ async function getCachedResponse(request, context) {
 
             // Delete page from local CDN for tests purposes 
             // But not deleted from Cache Reserve page is still in cache 
-            if(context["CDN-delete"]) {
+            if (context["CDN-delete"]) {
                 let deleteStatus = await cache.delete(cacheKeyRequest);
                 status += ",Deleted,";
                 let headers = new Headers();
@@ -529,7 +620,7 @@ async function getCachedResponse(request, context) {
                 deleted = true;
             }
 
-            if(!deleted){
+            if (!deleted) {
                 // check the previous version of the cache before purge and soft revalidate
                 // requestin in advance to save time 
                 staleCachePromise = cache.match(staleCacheKeyRequest);
@@ -552,21 +643,21 @@ async function getCachedResponse(request, context) {
                 console.log("From CDN EDGE cache");
             }
 
-            let useStale = true;       
+            let useStale = true;
 
             if (cachedResponse) {
                 // Copy Response object so that we can edit headers.
                 cachedResponse = new Response(cachedResponse.body, cachedResponse);
-                if(needsRevalidate) {
+                if (needsRevalidate) {
                     cachedResponse.headers.set('stale-version', (cacheVer - 1).toString());
                 }
-                if(R2StaleUsed) {
+                if (R2StaleUsed) {
                     cachedResponse.headers.set('r2-stale', "true");
                     context['r2-stale'] = true;
-                } 
-                if(!R2StaleUsed && needsRevalidate) {
+                }
+                if (!R2StaleUsed && needsRevalidate) {
                     cachedResponse.headers.set('cdn-stale', "true");
-                } 
+                }
                 if (DEBUG)
                     cachedResponse.headers.set("Key", cacheKeyRequest.url.toString());
 
@@ -704,12 +795,12 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
             cdnCachedResponse.headers.delete("R2");
             cdnCachedResponse.headers.delete("R2-Get");
 
-            let cachePromiss = cache.put(cacheKeyRequest, cdnCachedResponse);
+            let cachePromiss = await cache.put(cacheKeyRequest, cdnCachedResponse);
             status += ",Saved CDN,";
             context.version = cacheVer.toString();
 
             // Wait for cache Promise
-            await Promise.resolve(cachePromiss);
+            //await Promise.resolve(cachePromiss);
         } catch (err) {
             console.log("Catch Cache Error: " + err.message);
             status += ",Cache Response Exception:" + err.message + ",";
@@ -783,8 +874,7 @@ async function getCurrentCacheVersion(cacheVer) {
     if (cacheVer === null) {
         if (typeof KV !== 'undefined') {
             cacheVer = await KV.get('html_cache_version');
-
-            if (cacheVer === null || cacheVer > 1000) {
+            if (isNaN(cacheVer) || cacheVer === null || cacheVer > 1000 || cacheVer === "") {
                 // 1000 is overflow protection
                 // Uninitialized - first time through, initialize KV with a value
                 // Blocking but should only happen immediately after worker activation.
@@ -886,8 +976,31 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
 }
 
 function normalizeUrl(url) {
-        for (var filter of FILTER_GET) {        
-                url.searchParams.delete(filter);
-        }
+    for (var filter of FILTER_GET) {
+        url.searchParams.delete(filter);
+    }
     return url;
+}
+
+async function processESI(response, context) {
+    const regex = /<esi:include\s*src="(?<src>.*)"\s*(?:ttl="(?<ttl>\d*)")\/>/gm;
+    let responseText = await response.text();
+    responseText = responseText + "<esi:include  src=\"http://domain.com/index.php/page_cache/block/esi/blocks\" ttl=\"30\"/> \n  <esi:include  src=\"http://aaa.com/index.php/page_cache/block/esi/blocks\" ttl=\"30\"/>";
+    let matches = null;
+    let m = [];
+
+    while ((matches = regex.exec(responseText)) !== null) {
+        // This is necessary to avoid infinite loops with zero-width matches
+        if (matches.index === regex.lastIndex) {
+            regex.lastIndex++;
+        }
+        m.push({ matches: matches.groups, source: matches[0] });
+        matches.forEach((match, groupIndex) => {
+            console.log(`Found match, group ${groupIndex}: ${match}`);
+        });
+    }
+    console.log('Matches:');
+    console.log(m);
+    // console.log(matches.groups);
+    return responseText;
 }
