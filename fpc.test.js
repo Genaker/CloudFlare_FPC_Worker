@@ -218,6 +218,7 @@ describe("FPC TESTS", () => {
     expect(parseInt(headers.get('stale-version'))).toEqual(parseInt(currentVersion) - 1);
   });
 
+  // Randomly fails. It is ok. 
   test('Fetch second time after Change Version #2', async () => {
     // Clears it not right away
     const url = URL + uniqueParam;

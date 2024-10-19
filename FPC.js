@@ -29,7 +29,7 @@ const DEFAULT_BYPASS_COOKIES = [
     //"X-Magento-Vary"
 ];
 
-const DEBUG = true;
+const DEBUG = getConfigValue("DEBUG", true);
 
 // Filtered get parameters
 const FILTER_GET = [
@@ -103,15 +103,14 @@ const CACHE_ALWAYS = [
     'banner/ajax/load'
 ]
 
-const CUSTOM_CORS = [
+const CUSTOM_CORS = getConfigValue("CUSTOM_CORS", [], 'array');
 
-];
-
-const CUSTOM_PRELOAD = [
+const CUSTOM_PRELOAD = getConfigValue("CUSTOM_PRELOAD", [
     "<https://fonts.gstatic.com>; rel=preconnect",
     //Link: </style.css>; rel=preload; as=style
     //Link: </script.js>; rel=preload; as=script
-];
+],
+    'array');
 
 const CUSTOM_SPECULATION = {
     'prefetch': [{ //prerender - is not recommended
@@ -135,21 +134,26 @@ const CUSTOM_SPECULATION = {
                 }
             ]
         },
-        // Moderete is the best other one generate too much trafic on worker. and could increase $
+        // Moderate is the best other one generate too much traffic on worker. and could increase $
         'eagerness': 'moderate' // moderate, eager
     }]
 };
 
-const SPECULATION_ENABLED = true;
-const SPECULATION_CHAHED_ONLY = true;
+const SPECULATION_ENABLED = getConfigValue("SPECULATION_ENABLED");
 
-const ENABLE_ESI_BLOCKS = false;
+const SPECULATION_CHAHED_ONLY = getConfigValue("SPECULATION_CHAHED_ONLY");
+
+const ENABLE_ESI_BLOCKS = getConfigValue("ENABLE_ESI_BLOCKS", false);
+
+// Prevent any cache invalidations - 100% static 
+const GOD_MOD = getConfigValue("GOD_MOD", false);
 
 //Some legacy stuff. Bots doesn't have it and produces cache MISSES
 const ACCEPT_CONTENT_HEADER = 'Accept';
-// Revalidate the cache every N sec
+
+// Revalidate the cache every N secs
 // User will receive old/stale version
-const REVALIDATE_AGE = 360;
+const REVALIDATE_AGE = getConfigValue("REVALIDATE_AGE", 360, 'int');
 
 /**
 * Main worker entry point.
@@ -161,8 +165,8 @@ addEventListener("fetch", async event => {
         event: event,
         promise: null,
         'r2-stale': false,
-        'CDN-miss': false, //emulate cache miss on CDN
-        'CDN-ttl': 99999999999, //ttl to test revalidation
+        'CDN-miss': false, // emulate cache miss on CDN
+        'CDN-ttl': 99999999999, // ttl to test revalidation
         'R2-miss': false, // Emulate cache miss on Page Reserve 
         'CDN-delete': false, // Delete page for test 
         'set-version': "",
@@ -293,11 +297,18 @@ async function processRequest(originalRequest, context) {
     // Request to purge cache by Adding Version
     if (originalRequest.url.indexOf('cf-purge') >= 0) {
         console.log("Clearing the cache");
-        let newCacheVersion = await purgeCache(cacheVer, event);
-        status += ',Purged,';
-        return new Response("Cache Purged (NEW VERSION " + (cacheVer + 1) + ") Successfully!!", {
-            headers: new Headers({ 'cache-version': newCacheVersion }), status: 222
-        });
+        if (!GOD_MOD) {
+            let newCacheVersion = await purgeCache(cacheVer, event);
+            status += ',Purged,';
+            return new Response("Cache Purged (NEW VERSION: " + (cacheVer + 1) + ") Successfully!!", {
+                headers: new Headers({ 'cache-version': newCacheVersion }), status: 222
+            });
+        } else {
+            status += ',GODMOD,';
+            return new Response("Cache NOT Purged (NEW VERSION: GODMOD) Successfully!!", {
+                headers: new Headers({ 'cache-version': "GODMOD" }), status: 222
+            });
+        }
     }
 
     // Restore version after test.
@@ -1003,4 +1014,49 @@ async function processESI(response, context) {
     console.log(m);
     // console.log(matches.groups);
     return responseText;
+}
+
+/**
+* Get config value if it is set in Variables and Secrets worker settings tab 
+* @param {String} variableName - Name of the variables in the Variables and Secrets worker section
+* @param {any} defaultValue - default value
+* @param {String} type - JS variable type 
+* @returns {any} value
+*/
+function getConfigValue(variableName, defaultValue = true, type = 'bool') {
+    let configValue = this[variableName];
+    let value;
+    let status = 'default';
+    if (typeof configValue === 'undefined') {
+        value = defaultValue;
+    } else {
+        status = 'config';
+        console.log(configValue);
+        switch (type) {
+            case 'bool':
+                if (configValue = "false") {
+                    value = false;
+                } else {
+                    value = true;
+                }
+                break
+            case 'int':
+                value = parseInt(configValue);
+                break
+            case 'float':
+                value = parseFloat(configValue);
+                break
+            case 'obj':
+                value = JSON.parse(configValue);
+                break
+            case 'array':
+                value = JSON.parse(configValue);
+                break
+            default:
+                value = defaultValue;
+        }
+    }
+    console.log(value);
+    console.log("Config[" + status + "]: " + variableName + " = " + String(value));
+    return value;
 }
