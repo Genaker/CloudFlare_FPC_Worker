@@ -496,3 +496,7 @@ describe("Speculation Rules Test", () => {
     expect(response.headers.get('x-html-edge-cache-version')).toEqual(beforeTestVersion);
     })
   })
+
+describe("GOOD_MOD tests", () => {
+    test('Pre Fetch Url', () => {});
+})

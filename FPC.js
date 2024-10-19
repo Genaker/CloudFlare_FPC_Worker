@@ -29,8 +29,6 @@ const DEFAULT_BYPASS_COOKIES = [
     //"X-Magento-Vary"
 ];
 
-const DEBUG = getConfigValue("DEBUG", true);
-
 // Filtered get parameters
 const FILTER_GET = [
     // Facebook related
@@ -112,54 +110,31 @@ const CUSTOM_PRELOAD = getConfigValue("CUSTOM_PRELOAD", [
 ],
     'array');
 
-const CUSTOM_SPECULATION = {
-    'prefetch': [{ //prerender - is not recommended
-        'source': 'document',
-        'where': {
-            'and': [
-                { 'href_matches': '/*' },
-                { 'not': { 'selector_matches': ['.action', '.skip-prerender', '.skip-prefetch'] } },
-                { 'not': { 'selector_matches': '[rel~=nofollow]' } },
-                {
-                    'not': {
-                        'href_matches': [
-                            'checkout',
-                            'customer',
-                            'search',
-                            'catalogsearch',
-                            'product_compare',
-                            'wishlist'
-                        ]
-                    }
-                }
-            ]
-        },
-        // Moderate is the best other one generate too much traffic on worker. and could increase $
-        'eagerness': 'moderate' // moderate, eager
-    }]
-};
-
-const SPECULATION_ENABLED = getConfigValue("SPECULATION_ENABLED");
-
-const SPECULATION_CHAHED_ONLY = getConfigValue("SPECULATION_CHAHED_ONLY");
-
-const ENABLE_ESI_BLOCKS = getConfigValue("ENABLE_ESI_BLOCKS", false);
-
-// Prevent any cache invalidations - 100% static 
-const GOD_MOD = getConfigValue("GOD_MOD", false);
-
 //Some legacy stuff. Bots doesn't have it and produces cache MISSES
 const ACCEPT_CONTENT_HEADER = 'Accept';
 
+// Config variables will be assigned in the main loop.
+var DEBUG;
+var CUSTOM_SPECULATION;
+var SPECULATION_ENABLED;
+var SPECULATION_CACHED_ONLY;
+var ENABLE_ESI_BLOCKS;
+// Prevent any cache invalidations - 100% static 
+var GOD_MOD;
 // Revalidate the cache every N secs
 // User will receive old/stale version
-const REVALIDATE_AGE = getConfigValue("REVALIDATE_AGE", 360, 'int');
+var REVALIDATE_AGE;
 
 /**
 * Main worker entry point.
 */
 addEventListener("fetch", async event => {
     let startWorkerTime = Date.now();
+    let startConfigTime = Date.now();
+    processConfig(event);
+    let endConfigTime = Date.now();
+    console.log('Config Processing Time: ' + (endConfigTime - startConfigTime).toString());  // 0
+
     console.log(event.request);
     let context = {
         event: event,
@@ -327,7 +302,7 @@ async function processRequest(originalRequest, context) {
     }
 
     if (response === null) {
-        if (context['speculation'] === true && SPECULATION_CHAHED_ONLY) {
+        if (context['speculation'] === true && SPECULATION_CACHED_ONLY) {
             return new Response("Specualtion only from the CDN cache", { headers: new Headers({ "Cache-Control": "no-store,private" }), status: 406 });
         }
 
@@ -707,6 +682,7 @@ async function getCachedResponse(request, context) {
     return { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways };
 }
 
+
 /**
 * Asynchronously purge the HTML cache.
 * @param {Int} cacheVer - Current cache version (if retrieved)
@@ -1047,7 +1023,11 @@ function getConfigValue(variableName, defaultValue = true, type = 'bool') {
                 value = parseFloat(configValue);
                 break
             case 'obj':
-                value = JSON.parse(configValue);
+                if (typeof configValue === "string") {
+                    value = JSON.parse(configValue);
+                } else if (typeof configValue === "object") {
+                    value = configValue;
+                }
                 break
             case 'array':
                 value = JSON.parse(configValue);
@@ -1059,4 +1039,53 @@ function getConfigValue(variableName, defaultValue = true, type = 'bool') {
     console.log(value);
     console.log("Config[" + status + "]: " + variableName + " = " + String(value));
     return value;
+}
+
+/**
+ * Read init variables from the Worker Settings environmental vars "Variables & Secrets"
+ */
+function processConfig(event) {
+    // We need to add ENV_ to the variables or value will be global and no way to refresh it from the CF Admin without redeployment
+    // Worker Variable name should be !== name of the variable from the config
+    DEBUG = getConfigValue("ENV_DEBUG", true);
+
+    CUSTOM_SPECULATION = getConfigValue("ENV_CUSTOM_SPECULATION", {
+        'prefetch': [{ //prerender - is not recommended
+            'source': 'document',
+            'where': {
+                'and': [
+                    { 'href_matches': '/*' },
+                    { 'not': { 'selector_matches': ['.action', '.skip-prerender', '.skip-prefetch'] } },
+                    { 'not': { 'selector_matches': '[rel~=nofollow]' } },
+                    {
+                        'not': {
+                            'href_matches': [
+                                'checkout',
+                                'customer',
+                                'search',
+                                'catalogsearch',
+                                'product_compare',
+                                'wishlist'
+                            ]
+                        }
+                    }
+                ]
+            },
+            // Moderate is the best other one generate too much traffic on worker. and could increase $
+            'eagerness': 'moderate' // moderate, eager
+        }]
+    }, 'obj');
+
+    SPECULATION_ENABLED = getConfigValue("ENV_SPECULATION_ENABLED");
+
+    SPECULATION_CACHED_ONLY = getConfigValue("ENV_SPECULATION_CACHED_ONLY");
+
+    ENABLE_ESI_BLOCKS = getConfigValue("ENV_ENABLE_ESI_BLOCKS", false);
+
+    // Prevent any cache invalidations - 100% static 
+    GOD_MOD = getConfigValue("ENV_GOD_MOD", false);
+
+    // Revalidate the cache every N secs
+    // User will receive old/stale version
+    REVALIDATE_AGE = getConfigValue("ENV_REVALIDATE_AGE", 360, 'int');
 }
