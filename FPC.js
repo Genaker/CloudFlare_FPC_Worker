@@ -984,7 +984,6 @@ function normalizeUrl(url) {
 async function processESI(response, context) {
     const regex = /<esi:include\s*src="(?<src>.*)"\s*(?:ttl="(?<ttl>\d*)")\/>/gm;
     let responseText = await response.text();
-    responseText = responseText + "<esi:include  src=\"http://google.com/index.php/page_cache/block/esi/blocks\" ttl=\"30\"/> \n  <esi:include  src=\"http://google.fr/index.php/page_cache/block/esi/blocks\" ttl=\"30\"/>";
     let matches = null;
     let esiTags = [];
 
