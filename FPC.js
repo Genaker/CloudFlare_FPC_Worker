@@ -6,6 +6,18 @@
 // Separate cache for the mobile devices
 const MOBILECACHE_DIFFERENT = false;
 
+var KV_CONFIG_LAST_SYNC = null;
+
+var KV_CONFIG_CHECK = [];
+var KV_CONFIG = [];
+
+//KV Config doesn't make sens. ENV var change automatically deploys new Worker version 
+const KV_CONFIG_ENABLED = false;
+
+//limited to 128 MB
+var WORKER_CACHE_STORAGE = [];
+var WORKER_CACHE_STAT = [];
+
 // API settings if KV isn't being used
 const CLOUDFLARE_API = {
     email: "", // From https://dash.cloudflare.com/profile
@@ -67,7 +79,11 @@ const ALLOWED_GET = [
     'product_list_limit',
     'q',
     'fpc',
-    'price'
+    'price',
+    'id',
+    'limit',
+    'order',
+    'mode'
 ];
 
 // URLs will not be cached
@@ -101,20 +117,13 @@ const CACHE_ALWAYS = [
     'banner/ajax/load'
 ]
 
-const CUSTOM_CORS = getConfigValue("CUSTOM_CORS", [], 'array');
-
-const CUSTOM_PRELOAD = getConfigValue("CUSTOM_PRELOAD", [
-    "<https://fonts.gstatic.com>; rel=preconnect",
-    //Link: </style.css>; rel=preload; as=style
-    //Link: </script.js>; rel=preload; as=script
-],
-    'array');
-
 //Some legacy stuff. Bots doesn't have it and produces cache MISSES
 const ACCEPT_CONTENT_HEADER = 'Accept';
 
 // Config variables will be assigned in the main loop.
 var DEBUG;
+var CUSTOM_CORS;
+var CUSTOM_PRELOAD;
 var CUSTOM_SPECULATION;
 var SPECULATION_ENABLED;
 var SPECULATION_CACHED_ONLY;
@@ -124,6 +133,9 @@ var GOD_MOD;
 // Revalidate the cache every N secs
 // User will receive old/stale version
 var REVALIDATE_AGE;
+var TEST;
+
+processConfig();
 
 /**
 * Main worker entry point.
@@ -131,7 +143,7 @@ var REVALIDATE_AGE;
 addEventListener("fetch", async event => {
     let startWorkerTime = Date.now();
     let startConfigTime = Date.now();
-    processConfig(event);
+
     let endConfigTime = Date.now();
     console.log('Config Processing Time: ' + (endConfigTime - startConfigTime).toString());  // 0
 
@@ -151,7 +163,7 @@ addEventListener("fetch", async event => {
 
     const cacheUrl = new URL(request0.url);
 
-    // Saving worker specific GET parameters to context before URL normalisation
+    // Saving worker specific GET parameters to context before URL normalization
     if (cacheUrl.searchParams.get('cfw') === "false") {
         console.log("bypass worker");
         event.passThroughOnException();
@@ -303,7 +315,7 @@ async function processRequest(originalRequest, context) {
 
     if (response === null) {
         if (context['speculation'] === true && SPECULATION_CACHED_ONLY) {
-            return new Response("Specualtion only from the CDN cache", { headers: new Headers({ "Cache-Control": "no-store,private" }), status: 406 });
+            return new Response("Speculation only from the CDN cache", { headers: new Headers({ "Cache-Control": "no-store,private" }), status: 406 });
         }
 
         console.log("Not From Cache");
@@ -327,6 +339,7 @@ async function processRequest(originalRequest, context) {
         console.log("Origin-Time:" + (originTimeEnd - originTimeStart).toString());
         if (ENABLE_ESI_BLOCKS) {
             let newBody = await processESI(response.clone(), context);
+            response = new Response(newBody, response);
         }
         //ToDo: Seams redundant refactor
         if (response) {
@@ -682,7 +695,6 @@ async function getCachedResponse(request, context) {
     return { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways };
 }
 
-
 /**
 * Asynchronously purge the HTML cache.
 * @param {Int} cacheVer - Current cache version (if retrieved)
@@ -782,12 +794,12 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
             cdnCachedResponse.headers.delete("R2");
             cdnCachedResponse.headers.delete("R2-Get");
 
-            let cachePromiss = await cache.put(cacheKeyRequest, cdnCachedResponse);
+            let cachePromise = await cache.put(cacheKeyRequest, cdnCachedResponse);
             status += ",Saved CDN,";
             context.version = cacheVer.toString();
 
             // Wait for cache Promise
-            //await Promise.resolve(cachePromiss);
+            //await Promise.resolve(cachePromise);
         } catch (err) {
             console.log("Catch Cache Error: " + err.message);
             status += ",Cache Response Exception:" + err.message + ",";
@@ -860,7 +872,7 @@ function getResponseCacheControl(response) {
 async function getCurrentCacheVersion(cacheVer) {
     if (cacheVer === null) {
         if (typeof KV !== 'undefined') {
-            cacheVer = await KV.get('html_cache_version');
+            cacheVer = await KV.get('html_cache_version', { cacheTtl: 60 });
             if (isNaN(cacheVer) || cacheVer === null || cacheVer > 1000 || cacheVer === "") {
                 // 1000 is overflow protection
                 // Uninitialized - first time through, initialize KV with a value
@@ -972,23 +984,37 @@ function normalizeUrl(url) {
 async function processESI(response, context) {
     const regex = /<esi:include\s*src="(?<src>.*)"\s*(?:ttl="(?<ttl>\d*)")\/>/gm;
     let responseText = await response.text();
-    responseText = responseText + "<esi:include  src=\"http://domain.com/index.php/page_cache/block/esi/blocks\" ttl=\"30\"/> \n  <esi:include  src=\"http://aaa.com/index.php/page_cache/block/esi/blocks\" ttl=\"30\"/>";
+    responseText = responseText + "<esi:include  src=\"http://google.com/index.php/page_cache/block/esi/blocks\" ttl=\"30\"/> \n  <esi:include  src=\"http://google.fr/index.php/page_cache/block/esi/blocks\" ttl=\"30\"/>";
     let matches = null;
-    let m = [];
+    let esiTags = [];
 
     while ((matches = regex.exec(responseText)) !== null) {
         // This is necessary to avoid infinite loops with zero-width matches
         if (matches.index === regex.lastIndex) {
             regex.lastIndex++;
         }
-        m.push({ matches: matches.groups, source: matches[0] });
+        esiTags.push({ matches: matches.groups, source: matches[0] });
         matches.forEach((match, groupIndex) => {
             console.log(`Found match, group ${groupIndex}: ${match}`);
         });
     }
     console.log('Matches:');
-    console.log(m);
-    // console.log(matches.groups);
+    console.log(esiTags);
+    let subRequest = [];
+    esiTags.forEach(match => {
+        subRequest.push(fetch(match.matches.src));
+    });
+    let results = await Promise.all(subRequest);
+
+    results.forEach(async (result, ind) => {
+        console.log(esiTags[ind].source);
+        if (result.status === 200) {
+            responseText = responseText.replace(esiTags[ind].source, await result.text());
+        } else {
+            responseText = responseText.replace(esiTags[ind].source, "<!--ESI not 200-->");
+        }
+    });
+    //console.log(responseText);
     return responseText;
 }
 
@@ -1001,21 +1027,28 @@ async function processESI(response, context) {
 */
 function getConfigValue(variableName, defaultValue = true, type = 'bool') {
     let configValue = this[variableName];
-    let value;
+    KV_CONFIG_CHECK[variableName] = variableName;
+    let value = null;
     let status = 'default';
-    if (typeof configValue === 'undefined') {
+
+    if (KV_CONFIG_ENABLED && typeof KV_CONFIG[variableName] !== 'undefined' && KV_CONFIG[variableName] !== null) {
+        value = KV_CONFIG[variableName];
+    } else if (typeof configValue === 'undefined') {
         value = defaultValue;
     } else {
         status = 'config';
         console.log(configValue);
         switch (type) {
             case 'bool':
-                if (configValue = "false") {
+                if (configValue === "false") {
                     value = false;
                 } else {
                     value = true;
                 }
                 break
+            case 'str':
+                value = configValue;
+                break;
             case 'int':
                 value = parseInt(configValue);
                 break
@@ -1042,11 +1075,23 @@ function getConfigValue(variableName, defaultValue = true, type = 'bool') {
 }
 
 /**
- * Read init variables from the Worker Settings environmental vars "Variables & Secrets"
+ * Read init variables from the Worker Settings env vars "Variables & Secrets"
  */
-function processConfig(event) {
+function processConfig() {
+
+    if (KV_CONFIG_ENABLED) {
+        if (KV_CONFIG_LAST_SYNC === null) {
+            KV_CONFIG_LAST_SYNC = Date.now();
+        }
+        if ((Date.now() - KV_CONFIG_LAST_SYNC) === 360) {
+            //event.waitUntil(syncKvConfig());
+            KV_CONFIG_LAST_SYNC = Date.now();
+        }
+    }
+
     // We need to add ENV_ to the variables or value will be global and no way to refresh it from the CF Admin without redeployment
     // Worker Variable name should be !== name of the variable from the config
+    // To see the changes you need redeploy unfortunately 
     DEBUG = getConfigValue("ENV_DEBUG", true);
 
     CUSTOM_SPECULATION = getConfigValue("ENV_CUSTOM_SPECULATION", {
@@ -1078,6 +1123,8 @@ function processConfig(event) {
 
     SPECULATION_ENABLED = getConfigValue("ENV_SPECULATION_ENABLED");
 
+    TEST = getConfigValue("ENV_TEST", "test", 'str');
+
     SPECULATION_CACHED_ONLY = getConfigValue("ENV_SPECULATION_CACHED_ONLY");
 
     ENABLE_ESI_BLOCKS = getConfigValue("ENV_ENABLE_ESI_BLOCKS", false);
@@ -1088,4 +1135,23 @@ function processConfig(event) {
     // Revalidate the cache every N secs
     // User will receive old/stale version
     REVALIDATE_AGE = getConfigValue("ENV_REVALIDATE_AGE", 360, 'int');
+
+    CUSTOM_CORS = getConfigValue("ENV_CUSTOM_CORS", [], 'array');
+
+    CUSTOM_PRELOAD = getConfigValue("ENV_CUSTOM_PRELOAD", [
+        "<https://fonts.gstatic.com>; rel=preconnect",
+        //Link: </style.css>; rel=preload; as=style
+        //Link: </script.js>; rel=preload; as=script
+    ],
+        'array');
+}
+
+async function syncKvConfig() {
+    try {
+        Object.keys(KV_CONFIG_CHECK).forEach(async (confName) => {
+            KV_CONFIG[confName] = await KV.get(confName);
+        });
+    } catch (error) {
+        console.log(error);
+    }
 }

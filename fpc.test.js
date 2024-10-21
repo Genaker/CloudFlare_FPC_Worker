@@ -497,6 +497,6 @@ describe("Speculation Rules Test", () => {
     })
   })
 
-describe("GOOD_MOD tests", () => {
-    test('Pre Fetch Url', () => {});
+describe("GOD_MOD tests", () => {
+    test('PreFetch Url', () => {});
 })
