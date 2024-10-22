@@ -38,6 +38,7 @@ const VERSION_COOKIES = [
 
 // Default cookie prefixes for bypass
 const DEFAULT_BYPASS_COOKIES = [
+    'admin'
     //"X-Magento-Vary"
 ];
 
@@ -107,8 +108,7 @@ const BYPASS_URL = [
     'account',
     'feedonomics',
     'estimateddeliverydate',
-    'original-page',
-    'fpc'
+    'original-page'
 ];
 
 // URL will always be cached no matter what
@@ -157,17 +157,27 @@ addEventListener("fetch", async event => {
         'R2-miss': false, // Emulate cache miss on Page Reserve 
         'CDN-delete': false, // Delete page for test 
         'set-version': "",
-        'speculation': false
+        'speculation': false,
+        bypassCookies: false,
+        bypassUrl: false
     }
     const request0 = event.request;
 
     const cacheUrl = new URL(request0.url);
 
+    const bypassCookies = shouldBypassEdgeCache(event.request);
+    const bypassUrl = shouldBypassURL(request0);
+
     // Saving worker specific GET parameters to context before URL normalization
-    if (cacheUrl.searchParams.get('cfw') === "false") {
+    if (bypassUrl || cacheUrl.searchParams.get('cfw') === "false" || bypassCookies) {
         console.log("bypass worker");
         event.passThroughOnException();
-        event.respondWith(fetch(request0));
+
+        let headers = [{ name: "bypass-worker", value: "true" }, { name: "cf-cache-status", value: "BYPASS,WORKER,MISS" }];
+        if (bypassCookies) {
+            headers.push({ name: "bypass-cookies", value: "true" });
+        }
+        event.respondWith(fetchAndModifyHeaders(request0, headers));
         return true;
     }
     // Speculation rule Controller ;)
@@ -355,7 +365,7 @@ async function processRequest(originalRequest, context) {
                 await purgeCache(cacheVer, event);
                 status += ',Purged,';
             }
-            bypassCache = bypassCache || shouldBypassEdgeCache(request, response);
+            bypassCache = context.bypassCache; //|| shouldBypassEdgeCache(request, response);
             console.log("bypassCache: " + bypassCache);
             console.log("options: " + options);
 
@@ -388,7 +398,7 @@ async function processRequest(originalRequest, context) {
             console.log("Hit from the previous version Needs Revalidate: Current V: " + cacheVer + " Previous: " + (cacheVer - 1))
         }
         if (originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
-            bypassCache = bypassCache || shouldBypassEdgeCache(originalRequest, response);
+            bypassCache = bypassCache || context.bypassCookies;
             if (needsRevalidate || !bypassCache) {
                 const options = getResponseOptions(response);
                 if (needsRevalidate || !options) {
@@ -478,7 +488,7 @@ async function processRequest(originalRequest, context) {
 * @param {Response} response - Response
 * @returns {bool} true if the cache should be bypassed
 */
-function shouldBypassEdgeCache(request, response) {
+function shouldBypassEdgeCache(request, response = null) {
     let bypassCache = false;
 
     if (request /*&& response*/) {
@@ -565,7 +575,7 @@ async function getCachedResponse(request, context) {
 
     // Always cache some URLs
     if (!cacheAlways) {
-        byPassUrl = shouldBypassURL(request);
+        byPassUrl = context.bypassUrl; //|| shouldBypassURL(request);
 
         // Bypass static files
         if (byPassUrl) {
@@ -574,7 +584,7 @@ async function getCachedResponse(request, context) {
             bypassCache = true;
         } else {
             // Check to see if the response needs to be bypassed because of a cookie
-            bypassCache = shouldBypassEdgeCache(request, null);
+            bypassCache = context.bypassCookies; //|| shouldBypassEdgeCache(request, null);
             if (bypassCache)
                 status += ',BypassCookie,';
         }
@@ -808,6 +818,7 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
     return status;
 }
 
+
 /******************************************************************************
 * Utility Functions
 *****************************************************************************/
@@ -984,6 +995,7 @@ function normalizeUrl(url) {
 async function processESI(response, context) {
     const regex = /<esi:include\s*src="(?<src>.*)"\s*(?:ttl="(?<ttl>\d*)")\/>/gm;
     let responseText = await response.text();
+    responseText = responseText;
     let matches = null;
     let esiTags = [];
 
@@ -1018,7 +1030,7 @@ async function processESI(response, context) {
 }
 
 /**
-* Get config value if it is set in Variables and Secrets worker settings tab 
+* Get config value if it is set in the Variables and Secrets worker settings tab 
 * @param {String} variableName - Name of the variables in the Variables and Secrets worker section
 * @param {any} defaultValue - default value
 * @param {String} type - JS variable type 
@@ -1088,9 +1100,9 @@ function processConfig() {
         }
     }
 
-    // We need to add ENV_ to the variables or value will be global and no way to refresh it from the CF Admin without redeployment
+    // We need to add ENV_ to the variables or the value will be global, and no way to refresh it from the CF Admin without redeployment
     // Worker Variable name should be !== name of the variable from the config
-    // To see the changes you need redeploy unfortunately 
+    // To see the changes, you need to redeploy unfortunately 
     DEBUG = getConfigValue("ENV_DEBUG", true);
 
     CUSTOM_SPECULATION = getConfigValue("ENV_CUSTOM_SPECULATION", {
@@ -1153,4 +1165,14 @@ async function syncKvConfig() {
     } catch (error) {
         console.log(error);
     }
+}
+
+// event.respondWith expects async function or promise that's why just passing value doesn't work 
+async function fetchAndModifyHeaders(request, headers = []) {
+    let resp = await fetch(new Request(request));
+    let newResp = new Response(resp.body, resp);
+    for (let header of headers) {
+        newResp.headers.set(header.name, header.value);
+    }
+    return newResp;
 }
