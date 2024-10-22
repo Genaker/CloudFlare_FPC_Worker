@@ -308,8 +308,8 @@ describe("FPC TESTS", () => {
     console.log(response);
     console.log(headers);
     expect(response.status).toEqual(200);
-    expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
-    expect(headers.get('x-html-edge-cache-status')).toContain("BypassURL");
+    expect(headers.get('cf-cache-status')).toEqual("BYPASS,WORKER,MISS");
+    expect(headers.get('bypass-worker')).toEqual("true");
   });
 
   test('Test bypass and ignore parameters in URL', async () => {
@@ -323,14 +323,10 @@ describe("FPC TESTS", () => {
     console.log(response);
     console.log(headers);
     expect(response.status).toEqual(200);
-    expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
-    expect(headers.get('x-html-edge-cache-status')).toContain("BypassURL");
+    expect(headers.get('cf-cache-status')).toEqual("BYPASS,WORKER,MISS");
+    expect(headers.get('bypass-worker')).toEqual("true");
   });
-
-
-
 })
-
 
 describe("ASYNC revalidation Logic", () => {
   let localUniqueValue = Date.now();

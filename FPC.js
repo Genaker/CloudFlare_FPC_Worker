@@ -520,14 +520,16 @@ function shouldBypassEdgeCache(request, response = null) {
 
 function shouldBypassURL(request) {
     let bypassCache = false;
-
+    let url = new URL(request.url);
+    //ignoring host name
+    let searchUrl = url.pathname + url.search;
     if (BYPASS_URL && BYPASS_URL.length) {
         //console.log(BYPASS_URL);
         for (let pass of BYPASS_URL) {
             // See if the URL starts with any of the logged-in user prefixes
             //console.log("check: " + pass);
 
-            if (request.url.indexOf(pass) >= 0) {
+            if (searchUrl.indexOf(pass) >= 0) {
                 console.log("Should Bypass URL:" + pass);
                 bypassCache = true;
                 break;
@@ -817,7 +819,6 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
     }
     return status;
 }
-
 
 /******************************************************************************
 * Utility Functions
