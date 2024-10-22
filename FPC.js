@@ -42,6 +42,8 @@ const DEFAULT_BYPASS_COOKIES = [
     //"X-Magento-Vary"
 ];
 
+var ADMIN_URL = null;
+
 // Filtered get parameters
 const FILTER_GET = [
     // Facebook related
@@ -88,7 +90,7 @@ const ALLOWED_GET = [
 ];
 
 // URLs will not be cached
-const BYPASS_URL = [
+var BYPASS_URL = [
     'order',
     'onestepcheckout',
     'admin',
@@ -501,9 +503,11 @@ function shouldBypassEdgeCache(request, response = null) {
         if (cookieHeader && cookieHeader.length && bypassCookies.length) {
             const cookies = cookieHeader.split(';');
             for (let cookie of cookies) {
-                // See if the cookie starts with any of the logged-in user prefixes
+                // See if the cookie starts with any of the cookies
+                // Example: token=29281ed8-3981-4840-a91e-382f9bd50dd2"
+                // = is added to match full cookie name
                 for (let prefix of bypassCookies) {
-                    if (cookie.trim().startsWith(prefix)) {
+                    if (cookie.trim().startsWith(prefix + "=")) {
                         bypassCache = true;
                         break;
                     }
@@ -518,6 +522,13 @@ function shouldBypassEdgeCache(request, response = null) {
     return bypassCache;
 }
 
+/**
+ * Check if we should bypass url
+ * bypass if url contains any of BYPASS_URL 
+ * 
+ * @param {Request} request - original request
+ * @returns {boolean}
+ */
 function shouldBypassURL(request) {
     let bypassCache = false;
     let url = new URL(request.url);
@@ -863,6 +874,12 @@ function getResponseOptions(response) {
     return options;
 }
 
+/**
+ * Response check cache-control headers
+ * 
+ * @param {Response} response 
+ * @returns bool
+ */
 function getResponseCacheControl(response) {
     let cache = true;
     let header = response.headers.get('cache-control');
@@ -986,6 +1003,11 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
     return new Request(cacheUrl);
 }
 
+/**
+ * Normalize url 
+ * @param {url} url - original url
+ * @returns 
+ */
 function normalizeUrl(url) {
     for (var filter of FILTER_GET) {
         url.searchParams.delete(filter);
@@ -993,7 +1015,15 @@ function normalizeUrl(url) {
     return url;
 }
 
+/**
+ * ESI(Edge Side Include) tags processing 
+ * 
+ * @param {Response} response - Response with ESI tags
+ * @param {object} context - app context object
+ * @returns 
+ */
 async function processESI(response, context) {
+    // ESI tags is space and case sensitive 
     const regex = /<esi:include\s*src="(?<src>.*)"\s*(?:ttl="(?<ttl>\d*)")\/>/gm;
     let responseText = await response.text();
     responseText = responseText;
@@ -1058,15 +1088,18 @@ function getConfigValue(variableName, defaultValue = true, type = 'bool') {
                     value = true;
                 }
                 break
+            case 'string':
             case 'str':
                 value = configValue;
                 break;
+            case 'integer':
             case 'int':
                 value = parseInt(configValue);
                 break
             case 'float':
                 value = parseFloat(configValue);
                 break
+            case 'object':
             case 'obj':
                 if (typeof configValue === "string") {
                     value = JSON.parse(configValue);
@@ -1144,6 +1177,9 @@ function processConfig() {
     // Prevent any cache invalidations - 100% static 
     GOD_MOD = getConfigValue("ENV_GOD_MOD", false);
 
+    ADMIN_URL = getConfigValue("ENV_ADMIN_URL", 'admin', 'str');
+    BYPASS_URL.push(ADMIN_URL);
+
     // Revalidate the cache every N secs
     // User will receive old/stale version
     REVALIDATE_AGE = getConfigValue("ENV_REVALIDATE_AGE", 360, 'int');
@@ -1168,7 +1204,14 @@ async function syncKvConfig() {
     }
 }
 
-// event.respondWith expects async function or promise that's why just passing value doesn't work 
+/**
+ * Fetch request and modify headers
+ * event.respondWith expects async function or promise that's why just passing value doesn't work 
+ * 
+ * @param {Request} request - request to fetch
+ * @param {Array} headers - headers will be added to the response
+ * @returns Response
+ */
 async function fetchAndModifyHeaders(request, headers = []) {
     let resp = await fetch(new Request(request));
     let newResp = new Response(resp.body, resp);
