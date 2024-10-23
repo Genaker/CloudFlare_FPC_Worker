@@ -42,7 +42,7 @@ For CF FPC Worker to consider a response from a Magento backend as cacheable, th
 
  - Be a response to a GET request
  - Have a 2XX or 3XX status code.
- - Have a public Cache-Control header set with a non zero max-age, or s-maxage, value
+ - Have a public Cache-Control header set with a non-zero max-age, or s-maxage, value
  - Url doesn't match the worker's blacklist
 
 # Aditional features
@@ -53,8 +53,9 @@ For CF FPC Worker to consider a response from a Magento backend as cacheable, th
 - Speculation rules prerender and prefetch
 - Link header resource preload
 - Custom CORS
-- ESI (Edge Server Incluse - AJAX requests) blocks with auth and HTTPS support. Easy to use with microservices.
-- GOD MOD - cache can't be invalidated. It can be but not easy. 
+- ESI (Edge Server Include - AJAX requests) blocks with auth and HTTPS support. Easy to use with microservices.
+- GOD MOD - cache can't be invalidated. It can be but not easy.
+- PWA installable APP 
 
 # Worker and CF cache limitations:
  - The full-page cache is designed to work with the default magento cache, which is PHP Built-in FPC, FAST FPC (See repo: https://github.com/Genaker/FastFPC), or Varnish. You can try to use it as a main cache (see Cache Reserve), but it is not what it was designed for. ***The main idea of the CF Worker FPC Cache is Magento 2 pages are always served from the CF cache with async revalidation.**
