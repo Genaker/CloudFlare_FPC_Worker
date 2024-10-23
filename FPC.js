@@ -775,6 +775,16 @@ async function updateCache(originalRequest, cacheVer, event, cacheAlways) {
     request.headers.set('x-HTML-Edge-Cache', 'supports=cache|purgeall|bypass-cookies');
     let response = await fetch(request);
 
+    // We need duplicate this logic when invalidating the cache 
+    if (ENABLE_ESI_BLOCKS) {
+        let newBody = await processESI(response.clone(), null);
+        response = new Response(newBody, response);
+    }
+    if (PWA_ENABLED) {
+        let newBody = await processManifesto(response.clone(), null);
+        response = new Response(newBody, response);
+    }
+
     if (response) {
         status += ',Fetched,';
         const options = getResponseOptions(response);
