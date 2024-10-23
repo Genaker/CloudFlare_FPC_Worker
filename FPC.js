@@ -137,6 +137,10 @@ var GOD_MOD;
 var REVALIDATE_AGE;
 var TEST;
 
+var PWA_ENABLED = true;
+var PWA_IMAGE = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48IS0tIFVwbG9hZGVkIHRvOiBTVkcgUmVwbywgd3d3LnN2Z3JlcG8uY29tLCBHZW5lcmF0b3I6IFNWRyBSZXBvIE1peGVyIFRvb2xzIC0tPgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIKYXJpYS1sYWJlbD0iQ2xvdWRmbGFyZSIgcm9sZT0iaW1nIgp2aWV3Qm94PSIwIDAgNTEyIDUxMiI+PHJlY3QKd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiCnJ4PSIxNSUiCmZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjZjM4MDIwIiBkPSJNMzMxIDMyNmMxMS0yNi00LTM4LTE5LTM4bC0xNDgtMmMtNCAwLTQtNiAxLTdsMTUwLTJjMTctMSAzNy0xNSA0My0zMyAwIDAgMTAtMjEgOS0yNGE5NyA5NyAwIDAgMC0xODctMTFjLTM4LTI1LTc4IDktNjkgNDYtNDggMy02NSA0Ni02MCA3MiAwIDEgMSAyIDMgMmgyNzRjMSAwIDMtMSAzLTN6Ii8+PHBhdGggZmlsbD0iI2ZhYWU0MCIgZD0iTTM4MSAyMjRjLTQgMC02LTEtNyAxbC01IDIxYy01IDE2IDMgMzAgMjAgMzFsMzIgMmM0IDAgNCA2LTEgN2wtMzMgMWMtMzYgNC00NiAzOS00NiAzOSAwIDIgMCAzIDIgM2gxMTNsMy0yYTgxIDgxIDAgMCAwLTc4LTEwMyIvPjwvc3ZnPg=="
+var PWA_MANIFEST = { "theme_color": "#ffffff", "background_color": "#ffffff", "icons": [{ "sizes": "any", "src": PWA_IMAGE, "type": "image/svg+xml" }], "orientation": "any", "display": "standalone", "dir": "auto", "lang": "en-US", "id": "https://query.tilebar.com/", "start_url": "/", "scope": "https://query.tilebar.com/", "description": "Cloud Flare Magento PWA", "name": "Magento PWA", "short_name": "M2 PWA", "prefer_related_applications": false };
+
 processConfig();
 
 /**
@@ -188,6 +192,15 @@ addEventListener("fetch", async event => {
         event.passThroughOnException();
         event.respondWith(new Response(JSON.stringify(CUSTOM_SPECULATION), {
             headers: new Headers({ 'Content-Type': 'application/speculationrules+json' }), status: 200
+        }));
+        return true;
+    }
+
+    if (cacheUrl.toString().indexOf('cf/manifesto.json') >= 0) {
+        console.log("Manifest Rule");
+        event.passThroughOnException();
+        event.respondWith(new Response(JSON.stringify(PWA_MANIFEST), {
+            headers: new Headers({ 'Content-Type': 'application/manifest+json' }), status: 200
         }));
         return true;
     }
@@ -351,6 +364,10 @@ async function processRequest(originalRequest, context) {
         console.log("Origin-Time:" + (originTimeEnd - originTimeStart).toString());
         if (ENABLE_ESI_BLOCKS) {
             let newBody = await processESI(response.clone(), context);
+            response = new Response(newBody, response);
+        }
+        if (PWA_ENABLED) {
+            let newBody = await processManifesto(response.clone(), context);
             response = new Response(newBody, response);
         }
         //ToDo: Seams redundant refactor
@@ -1061,11 +1078,28 @@ async function processESI(response, context) {
 }
 
 /**
+ * Add manifesto to the responso 
+ * 
+ * @param {Response} response - responese to add manifest to
+ * @param {object} context 
+ * @returns {Promise<string>}
+ */
+async function processManifesto(response, context) {
+    // ESI tags is space and case sensitive 
+    const title = "</title>";
+    let responseText = await response.text();
+    responseText = responseText.replace(title, "</title><link rel=\"manifest\" href=\"/cf/manifesto.json\" />");
+
+    //console.log(responseText);
+    return responseText;
+}
+
+/**
 * Get config value if it is set in the Variables and Secrets worker settings tab 
 * @param {String} variableName - Name of the variables in the Variables and Secrets worker section
 * @param {any} defaultValue - default value
 * @param {String} type - JS variable type 
-* @returns {any} value
+* @returns {any}
 */
 function getConfigValue(variableName, defaultValue = true, type = 'bool') {
     let configValue = this[variableName];
@@ -1186,14 +1220,22 @@ function processConfig() {
 
     CUSTOM_CORS = getConfigValue("ENV_CUSTOM_CORS", [], 'array');
 
+    PWA_ENABLED = getConfigValue("ENV_PWA_ENABLED", PWA_ENABLED);
+
     CUSTOM_PRELOAD = getConfigValue("ENV_CUSTOM_PRELOAD", [
         "<https://fonts.gstatic.com>; rel=preconnect",
         //Link: </style.css>; rel=preload; as=style
         //Link: </script.js>; rel=preload; as=script
     ],
         'array');
+
+    PWA_MANIFEST = getConfigValue("ENV_PWA_MANIFEST", PWA_MANIFEST,
+        'obj');
 }
 
+/**
+ * Sync Config from the KV storage
+ */
 async function syncKvConfig() {
     try {
         Object.keys(KV_CONFIG_CHECK).forEach(async (confName) => {
