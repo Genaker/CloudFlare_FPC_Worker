@@ -191,7 +191,7 @@ addEventListener("fetch", async event => {
         console.log("Speculation Rule");
         event.passThroughOnException();
         event.respondWith(new Response(JSON.stringify(CUSTOM_SPECULATION), {
-            headers: new Headers({ 'Content-Type': 'application/speculationrules+json' }), status: 200
+            headers: new Headers({ 'Content-Type': 'application/speculationrules+json', "Cache-Control": "public, max-age=604800" }), status: 200
         }));
         return true;
     }
@@ -200,7 +200,7 @@ addEventListener("fetch", async event => {
         console.log("Manifest Rule");
         event.passThroughOnException();
         event.respondWith(new Response(JSON.stringify(PWA_MANIFEST), {
-            headers: new Headers({ 'Content-Type': 'application/manifest+json' }), status: 200
+            headers: new Headers({ 'Content-Type': 'application/manifest+json', "Cache-Control": "public, max-age=604800" }), status: 200
         }));
         return true;
     }
