@@ -137,9 +137,10 @@ var GOD_MOD;
 var REVALIDATE_AGE;
 var TEST;
 
+var PWA_SPECULATION_VERSION = 1;
 var PWA_ENABLED = true;
 var PWA_IMAGE = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48IS0tIFVwbG9hZGVkIHRvOiBTVkcgUmVwbywgd3d3LnN2Z3JlcG8uY29tLCBHZW5lcmF0b3I6IFNWRyBSZXBvIE1peGVyIFRvb2xzIC0tPgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIKYXJpYS1sYWJlbD0iQ2xvdWRmbGFyZSIgcm9sZT0iaW1nIgp2aWV3Qm94PSIwIDAgNTEyIDUxMiI+PHJlY3QKd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiCnJ4PSIxNSUiCmZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjZjM4MDIwIiBkPSJNMzMxIDMyNmMxMS0yNi00LTM4LTE5LTM4bC0xNDgtMmMtNCAwLTQtNiAxLTdsMTUwLTJjMTctMSAzNy0xNSA0My0zMyAwIDAgMTAtMjEgOS0yNGE5NyA5NyAwIDAgMC0xODctMTFjLTM4LTI1LTc4IDktNjkgNDYtNDggMy02NSA0Ni02MCA3MiAwIDEgMSAyIDMgMmgyNzRjMSAwIDMtMSAzLTN6Ii8+PHBhdGggZmlsbD0iI2ZhYWU0MCIgZD0iTTM4MSAyMjRjLTQgMC02LTEtNyAxbC01IDIxYy01IDE2IDMgMzAgMjAgMzFsMzIgMmM0IDAgNCA2LTEgN2wtMzMgMWMtMzYgNC00NiAzOS00NiAzOSAwIDIgMCAzIDIgM2gxMTNsMy0yYTgxIDgxIDAgMCAwLTc4LTEwMyIvPjwvc3ZnPg=="
-var PWA_MANIFEST = { "theme_color": "#ffffff", "background_color": "#ffffff", "icons": [{ "sizes": "any", "src": PWA_IMAGE, "type": "image/svg+xml" }], "orientation": "any", "display": "standalone", "dir": "auto", "lang": "en-US", "id": "https://query.tilebar.com/", "start_url": "/", "scope": "https://query.tilebar.com/", "description": "Cloud Flare Magento PWA", "name": "Magento PWA", "short_name": "M2 PWA", "prefer_related_applications": false };
+var PWA_MANIFEST = { "theme_color": "#ffffff", "background_color": "#ffffff", "icons": [{ "sizes": "any", "src": PWA_IMAGE, "type": "image/svg+xml" }], "orientation": "any", "display": "standalone", "dir": "auto", "lang": "en-US", "id": "https://your-domain.com/", "start_url": "/", "scope": "https://your-domain.com/", "description": "Cloud Flare Magento PWA", "name": "Magento PWA", "short_name": "M2 PWA", "prefer_related_applications": false };
 
 processConfig();
 
@@ -170,6 +171,11 @@ addEventListener("fetch", async event => {
     const request0 = event.request;
 
     const cacheUrl = new URL(request0.url);
+
+    if (typeof ENV_PWA_MANIFEST === 'undefined') {
+        PWA_MANIFEST.scope = cacheUrl.origin;
+        PWA_MANIFEST.id = cacheUrl.origin;
+    }
 
     const bypassCookies = shouldBypassEdgeCache(event.request);
     const bypassUrl = shouldBypassURL(request0);
@@ -492,7 +498,7 @@ async function processRequest(originalRequest, context) {
         })
     }
     if (SPECULATION_ENABLED && !bypassCache) {
-        response.headers.set("Speculation-Rules", "\"/rules/speculation.json\"");
+        response.headers.set("Speculation-Rules", "\"/rules/speculation.json?v=" + PWA_SPECULATION_VERSION + "\"");
     }
 
     return response;
@@ -1098,7 +1104,7 @@ async function processManifesto(response, context) {
     // ESI tags is space and case sensitive 
     const title = "</title>";
     let responseText = await response.text();
-    responseText = responseText.replace(title, "</title><link rel=\"manifest\" href=\"/cf/manifesto.json\" />");
+    responseText = responseText.replace(title, "</title><link rel=\"manifest\" href=\"/cf/manifesto.json?v=" + PWA_SPECULATION_VERSION + "\" />");
 
     //console.log(responseText);
     return responseText;
@@ -1239,6 +1245,7 @@ function processConfig() {
     ],
         'array');
 
+    PWA_SPECULATION_VERSION = getConfigValue("ENV_PWA_SPECULATION_VERSION", PWA_SPECULATION_VERSION, 'int');
     PWA_MANIFEST = getConfigValue("ENV_PWA_MANIFEST", PWA_MANIFEST,
         'obj');
 }
