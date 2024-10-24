@@ -135,8 +135,10 @@ var GOD_MOD;
 // Revalidate the cache every N secs
 // User will receive old/stale version
 var REVALIDATE_AGE;
+var R2_STALE = true;
 var TEST;
 
+var HTML_CACHE_VERSION = 0;
 var PWA_SPECULATION_VERSION = 1;
 var PWA_ENABLED = true;
 var PWA_IMAGE = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48IS0tIFVwbG9hZGVkIHRvOiBTVkcgUmVwbywgd3d3LnN2Z3JlcG8uY29tLCBHZW5lcmF0b3I6IFNWRyBSZXBvIE1peGVyIFRvb2xzIC0tPgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIKYXJpYS1sYWJlbD0iQ2xvdWRmbGFyZSIgcm9sZT0iaW1nIgp2aWV3Qm94PSIwIDAgNTEyIDUxMiI+PHJlY3QKd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiCnJ4PSIxNSUiCmZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjZjM4MDIwIiBkPSJNMzMxIDMyNmMxMS0yNi00LTM4LTE5LTM4bC0xNDgtMmMtNCAwLTQtNiAxLTdsMTUwLTJjMTctMSAzNy0xNSA0My0zMyAwIDAgMTAtMjEgOS0yNGE5NyA5NyAwIDAgMC0xODctMTFjLTM4LTI1LTc4IDktNjkgNDYtNDggMy02NSA0Ni02MCA3MiAwIDEgMSAyIDMgMmgyNzRjMSAwIDMtMSAzLTN6Ii8+PHBhdGggZmlsbD0iI2ZhYWU0MCIgZD0iTTM4MSAyMjRjLTQgMC02LTEtNyAxbC01IDIxYy01IDE2IDMgMzAgMjAgMzFsMzIgMmM0IDAgNCA2LTEgN2wtMzMgMWMtMzYgNC00NiAzOS00NiAzOSAwIDIgMCAzIDIgM2gxMTNsMy0yYTgxIDgxIDAgMCAwLTc4LTEwMyIvPjwvc3ZnPg=="
@@ -172,7 +174,7 @@ addEventListener("fetch", async event => {
 
     const cacheUrl = new URL(request0.url);
 
-    if (typeof ENV_PWA_MANIFEST === 'undefined') {
+    if (PWA_ENABLED && typeof ENV_PWA_MANIFEST === 'undefined') {
         PWA_MANIFEST.scope = cacheUrl.origin;
         PWA_MANIFEST.id = cacheUrl.origin;
     }
@@ -932,6 +934,9 @@ function getResponseCacheControl(response) {
 * @returns {Int} The current cache version.
 */
 async function getCurrentCacheVersion(cacheVer) {
+    if (HTML_CACHE_VERSION > 0) {
+        return cacheVer = HTML_CACHE_VERSION;
+    }
     if (cacheVer === null) {
         if (typeof KV !== 'undefined') {
             cacheVer = await KV.get('html_cache_version', { cacheTtl: 60 });
@@ -1227,6 +1232,8 @@ function processConfig() {
     // Prevent any cache invalidations - 100% static 
     GOD_MOD = getConfigValue("ENV_GOD_MOD", false);
 
+    R2_STALE = getConfigValue("ENV_R2_STALE", R2_STALE);
+
     ADMIN_URL = getConfigValue("ENV_ADMIN_URL", 'admin', 'str');
     BYPASS_URL.push(ADMIN_URL);
 
@@ -1245,6 +1252,7 @@ function processConfig() {
     ],
         'array');
 
+    HTML_CACHE_VERSION = getConfigValue("ENV_HTML_CACHE_VERSION", HTML_CACHE_VERSION, 'int');
     PWA_SPECULATION_VERSION = getConfigValue("ENV_PWA_SPECULATION_VERSION", PWA_SPECULATION_VERSION, 'int');
     PWA_MANIFEST = getConfigValue("ENV_PWA_MANIFEST", PWA_MANIFEST,
         'obj');
