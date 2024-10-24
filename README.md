@@ -22,6 +22,7 @@ Run next command
 node generate.js
 ```
 
+#HTML CACHE VERSION
 CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if a cached version of the requested content is available in the CloudFlare locations or in the cache Reserve. This check for the cached version can have the following outcomes, depending on its state:
 
  - If a cached version is found and it's not stale, then the cached content is served to the user. No request is made to the Magento Server.
@@ -29,6 +30,13 @@ CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if
  - If a cached version isn't found, the CF FPC worker sends a request to the Magento server to be used for future requests.
 
 CF Worker “softpurge” the cache by changing cache Version stored in the KV(Key Value)storage. Cloud flare serve the stale content untill it will not be updayed asynchronously (in the background) fetches the new page. Cloud Front ignores any cache rules from Magento and has own logic which serve web pages from the CDN cache even if Magento 2 website is broken. 
+<br/>
+Now you can set *HTML_CACHE_VERSION* via the Cloud Flare dashboard by adding the variable **ENV_HTML_CACHE_VERSION**. It will override the default cache version logic and can't be purged except to set a new version from the dashboard.
+<img width="401" alt="image" src="https://github.com/user-attachments/assets/0da62145-fe10-4b05-9fb6-23c12780567d">
+
+#ENV VARIABLES
+You can override many variables by setting the from the dashboard by adding **ENV_** prefix to the var name:
+![image](https://github.com/user-attachments/assets/6fdc73d8-fe6e-41ad-ba7e-abc88aa1e12d)
 
 # Speculative Rules
 Speculation is added to the worker response.
