@@ -47,12 +47,33 @@ var ADMIN_URL = null;
 // Filtered get parameters
 const FILTER_GET = [
     // Facebook related
+    'fb_ad',
+    'fb_adid',
+    'fb_adset',
+    'fb_campaign',
+    'fb_adsetid',
+    'fb_campaignid',
+    'utm_id',
     'utm_source',
+    'matchtype',
+    'addisttype',
+    'gad_source',
+    'addisttype',
+    'adposition',
+    'gad_source',
+    'utm_term',
     'utm_medium',
     'utm_campaign',
     'utm_content',
     'fbclid',
     // google related
+    'g_keywordid',
+    'g_campaign',
+    'g_network',
+    'g_adgroupid',
+    'g_adtype',
+    'g_acctid',
+    'g_adid',
     'gclid',
     'gclsrc',
     'customer-service',
@@ -72,7 +93,7 @@ const CACHE_STATUSES = [
     200,
     301,
     302,
-    404
+    //404
 ];
 
 //Whitelisted GET parameters
@@ -129,14 +150,16 @@ var CUSTOM_PRELOAD;
 var CUSTOM_SPECULATION;
 var SPECULATION_ENABLED;
 var SPECULATION_CACHED_ONLY;
-var ENABLE_ESI_BLOCKS;
+var ENABLE_ESI_BLOCKS = false;
 // Prevent any cache invalidations - 100% static 
 var GOD_MOD;
 // Revalidate the cache every N secs
 // User will receive old/stale version
 var REVALIDATE_AGE;
+var R2_STALE = true;
 var TEST;
 
+var HTML_CACHE_VERSION = false;
 var PWA_SPECULATION_VERSION = 1;
 var PWA_ENABLED = true;
 var PWA_IMAGE = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48IS0tIFVwbG9hZGVkIHRvOiBTVkcgUmVwbywgd3d3LnN2Z3JlcG8uY29tLCBHZW5lcmF0b3I6IFNWRyBSZXBvIE1peGVyIFRvb2xzIC0tPgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIKYXJpYS1sYWJlbD0iQ2xvdWRmbGFyZSIgcm9sZT0iaW1nIgp2aWV3Qm94PSIwIDAgNTEyIDUxMiI+PHJlY3QKd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiCnJ4PSIxNSUiCmZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjZjM4MDIwIiBkPSJNMzMxIDMyNmMxMS0yNi00LTM4LTE5LTM4bC0xNDgtMmMtNCAwLTQtNiAxLTdsMTUwLTJjMTctMSAzNy0xNSA0My0zMyAwIDAgMTAtMjEgOS0yNGE5NyA5NyAwIDAgMC0xODctMTFjLTM4LTI1LTc4IDktNjkgNDYtNDggMy02NSA0Ni02MCA3MiAwIDEgMSAyIDMgMmgyNzRjMSAwIDMtMSAzLTN6Ii8+PHBhdGggZmlsbD0iI2ZhYWU0MCIgZD0iTTM4MSAyMjRjLTQgMC02LTEtNyAxbC01IDIxYy01IDE2IDMgMzAgMjAgMzFsMzIgMmM0IDAgNCA2LTEgN2wtMzMgMWMtMzYgNC00NiAzOS00NiAzOSAwIDIgMCAzIDIgM2gxMTNsMy0yYTgxIDgxIDAgMCAwLTc4LTEwMyIvPjwvc3ZnPg=="
@@ -172,7 +195,7 @@ addEventListener("fetch", async event => {
 
     const cacheUrl = new URL(request0.url);
 
-    if (typeof ENV_PWA_MANIFEST === 'undefined') {
+    if (PWA_ENABLED && typeof ENV_PWA_MANIFEST === 'undefined') {
         PWA_MANIFEST.scope = cacheUrl.origin;
         PWA_MANIFEST.id = cacheUrl.origin;
     }
@@ -369,11 +392,11 @@ async function processRequest(originalRequest, context) {
         originTimeEnd = Date.now();
         console.log("Origin-Time:" + (originTimeEnd - originTimeStart).toString());
         if (ENABLE_ESI_BLOCKS) {
-            let newBody = await processESI(response.clone(), context);
+            let newBody = await processESI(response, context);
             response = new Response(newBody, response);
         }
         if (PWA_ENABLED) {
-            let newBody = await processManifesto(response.clone(), context);
+            let newBody = await processManifesto(response, context);
             response = new Response(newBody, response);
         }
         //ToDo: Seams redundant refactor
@@ -783,11 +806,11 @@ async function updateCache(originalRequest, cacheVer, event, cacheAlways) {
 
     // We need duplicate this logic when invalidating the cache 
     if (ENABLE_ESI_BLOCKS) {
-        let newBody = await processESI(response.clone(), null);
+        let newBody = await processESI(response, null);
         response = new Response(newBody, response);
     }
     if (PWA_ENABLED) {
-        let newBody = await processManifesto(response.clone(), null);
+        let newBody = await processManifesto(response, null);
         response = new Response(newBody, response);
     }
 
@@ -932,6 +955,9 @@ function getResponseCacheControl(response) {
 * @returns {Int} The current cache version.
 */
 async function getCurrentCacheVersion(cacheVer) {
+    if (HTML_CACHE_VERSION !== false) {
+        return cacheVer = HTML_CACHE_VERSION;
+    }
     if (cacheVer === null) {
         if (typeof KV !== 'undefined') {
             cacheVer = await KV.get('html_cache_version', { cacheTtl: 60 });
@@ -1222,10 +1248,12 @@ function processConfig() {
 
     SPECULATION_CACHED_ONLY = getConfigValue("ENV_SPECULATION_CACHED_ONLY");
 
-    ENABLE_ESI_BLOCKS = getConfigValue("ENV_ENABLE_ESI_BLOCKS", false);
+    ENABLE_ESI_BLOCKS = getConfigValue("ENV_ENABLE_ESI_BLOCKS", ENABLE_ESI_BLOCKS);
 
     // Prevent any cache invalidations - 100% static 
     GOD_MOD = getConfigValue("ENV_GOD_MOD", false);
+
+    R2_STALE = getConfigValue("ENV_R2_STALE", R2_STALE);
 
     ADMIN_URL = getConfigValue("ENV_ADMIN_URL", 'admin', 'str');
     BYPASS_URL.push(ADMIN_URL);
@@ -1245,6 +1273,7 @@ function processConfig() {
     ],
         'array');
 
+    HTML_CACHE_VERSION = getConfigValue("ENV_HTML_CACHE_VERSION", HTML_CACHE_VERSION, 'int');
     PWA_SPECULATION_VERSION = getConfigValue("ENV_PWA_SPECULATION_VERSION", PWA_SPECULATION_VERSION, 'int');
     PWA_MANIFEST = getConfigValue("ENV_PWA_MANIFEST", PWA_MANIFEST,
         'obj');
