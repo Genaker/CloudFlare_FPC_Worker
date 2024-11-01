@@ -4,40 +4,41 @@
 // instead of the full cache.
 
 // Separate cache for the mobile devices
-const MOBILECACHE_DIFFERENT = false;
+var MOBILECACHE_DIFFERENT = false;
 
 var KV_CONFIG_LAST_SYNC = null;
 
 var KV_CONFIG_CHECK = [];
 var KV_CONFIG = [];
+var JSON_CONFIG = {};
 
 //KV Config doesn't make sens. ENV var change automatically deploys new Worker version 
-const KV_CONFIG_ENABLED = false;
+var KV_CONFIG_ENABLED = false;
 
 //limited to 128 MB
 var WORKER_CACHE_STORAGE = [];
 var WORKER_CACHE_STAT = [];
 
 // API settings if KV isn't being used
-const CLOUDFLARE_API = {
+var CLOUDFLARE_API = {
     email: "", // From https://dash.cloudflare.com/profile
     key: "", // Global API Key from https://dash.cloudflare.com/profile
     zone: "" // "Zone ID" from the API section of the dashboard overview page https://dash.cloudflare.com/
 };
 
 // No cache values
-const CACHE_CONTROL_NO_CACHE = [
+var CACHE_CONTROL_NO_CACHE = [
     'no-cache',
     'no-store'
 ];
 
 // Default cookie prefixes for logged-in users
-const VERSION_COOKIES = [
+var VERSION_COOKIES = [
     "X-Magento-Vary"
 ];
 
 // Default cookie prefixes for bypass
-const DEFAULT_BYPASS_COOKIES = [
+var DEFAULT_BYPASS_COOKIES = [
     'admin'
     //"X-Magento-Vary"
 ];
@@ -45,8 +46,9 @@ const DEFAULT_BYPASS_COOKIES = [
 var ADMIN_URL = null;
 
 // Filtered get parameters
-const FILTER_GET = [
+var FILTER_GET = [
     // Facebook related
+    'fbclid',
     'fb_ad',
     'fb_adid',
     'fb_adset',
@@ -57,23 +59,64 @@ const FILTER_GET = [
     'utm_source',
     'matchtype',
     'addisttype',
-    'gad_source',
-    'addisttype',
     'adposition',
     'gad_source',
     'utm_term',
     'utm_medium',
+    'utm_cam',
     'utm_campaign',
     'utm_content',
-    'fbclid',
+    'utm_creative',
+    'utm_adcontent',
+    'utm_adgroupid',
+    'wbraid',
+    'epik',
+    '_hsenc',
+    '_hsmi',
+    '__hstc',
+    'affiliate_code',
+    'referring_service',
+    'hsa_cam',
+    'hsa_acc',
+    'msclkid',
+    'hsa_grp',
+    'hsa_ad',
+    'hsa_src',
+    'hsa_net',
+    'hsa_ver',
+    'dm_i',
+    'uuid',
+    'dicbo',
+    'adgroupid',
+    '',
     // google related
     'g_keywordid',
+    'g_keyword',
+    'g_campaignid',
     'g_campaign',
     'g_network',
     'g_adgroupid',
     'g_adtype',
     'g_acctid',
     'g_adid',
+    'cq_plac',
+    'cq_net',
+    'cq_pos',
+    'cq_med',
+    'cq_plt',
+    '',
+    // 
+    'b_adgroup',
+    'b_adgroupid',
+    'b_adid',
+    'b_campaign',
+    'b_campaignid',
+    'b_isproduct',
+    'b_productid',
+    'b_term',
+    'b_termid',
+    'msclkid',
+    'gbraid',
     'gclid',
     'gclsrc',
     'customer-service',
@@ -83,13 +126,14 @@ const FILTER_GET = [
     'add',
     'srsltid', //new google parameter
     // worker specific
+    'gtm_debug',
     'cf-cdn',
     'r2-cdn',
     'cf-delete',
     'cf-ttl'
 ];
 
-const CACHE_STATUSES = [
+var CACHE_STATUSES = [
     200,
     301,
     302,
@@ -97,7 +141,7 @@ const CACHE_STATUSES = [
 ];
 
 //Whitelisted GET parameters
-const ALLOWED_GET = [
+var ALLOWED_GET = [
     'product_list_order',
     'p',
     'product_list_limit',
@@ -135,13 +179,13 @@ var BYPASS_URL = [
 ];
 
 // URL will always be cached no matter what
-const CACHE_ALWAYS = [
+var CACHE_ALWAYS = [
     'customer-service',
     'banner/ajax/load'
 ]
 
 //Some legacy stuff. Bots doesn't have it and produces cache MISSES
-const ACCEPT_CONTENT_HEADER = 'Accept';
+var ACCEPT_CONTENT_HEADER = 'Accept';
 
 // Config variables will be assigned in the main loop.
 var DEBUG;
@@ -471,6 +515,8 @@ async function processRequest(originalRequest, context) {
         let responseBody = response.clone().body;
         response = new Response(responseBody, response);
         response.headers.set('Origin-Time', (originTimeEnd - originTimeStart).toString());
+        response.headers.append('Server-Timing', 'fetch-origin;desc="Fetch From Origin";dur=' + (originTimeEnd - originTimeStart).toString());
+
         if (needsRevalidate) {
             response.headers.set('Stale', 'true');
         }
@@ -478,7 +524,9 @@ async function processRequest(originalRequest, context) {
             response.headers.set('Custom-TTL', context['CDN-ttl'].toString());
         }
 
-        response.headers.set('Cache-Check-Time', (getCachedTimeEnd - getCachedTimeStart).toString());
+        let getCacheTime = getCachedTimeEnd - getCachedTimeStart;
+        response.headers.set('Cache-Check-Time', getCacheTime.toString());
+        response.headers.append('Server-Timing', 'get-cache;desc="Get CF CDN CACHE";dur=' + getCacheTime.toString());
 
         status = status.replaceAll(",,", ",");
         status = status.replaceAll(" ", "");
@@ -508,8 +556,11 @@ async function processRequest(originalRequest, context) {
         let endWorkerTime = Date.now();
         console.log("Worker-Time: " + (endWorkerTime - startWorkerTime).toString());
         response.headers.set("Worker-Time", (endWorkerTime - startWorkerTime).toString());
-        let jsTime = ((endWorkerTime - startWorkerTime) - (originTimeEnd - originTimeStart)).toString()
+        response.headers.append('Server-Timing', 'worker-time;desc="Total Worker Time";dur=' + (endWorkerTime - startWorkerTime).toString());
+
+        let jsTime = ((endWorkerTime - startWorkerTime) - (originTimeEnd - originTimeStart) - getCacheTime).toString()
         response.headers.set("JS-Time", jsTime);
+        response.headers.append('Server-Timing', 'js-time;desc="JS Execution Time";dur=' + jsTime);
         console.log("JS-Time: " + jsTime);
     }
     console.log("Return Response");
@@ -1216,8 +1267,34 @@ function processConfig() {
     DEBUG = getConfigValue("ENV_DEBUG", true);
 
     CUSTOM_SPECULATION = getConfigValue("ENV_CUSTOM_SPECULATION", {
+        'prerender': [{ //prerender - on click (doesn't work togather with prefetch)
+            'source': 'document',
+            //"relative_to": "document",
+            'where': {
+                'and': [
+                    { 'href_matches': '/*' },
+                    { 'not': { 'selector_matches': ['.action', '.skip-prerender', '.skip-prefetch'] } },
+                    { 'not': { 'selector_matches': '[rel~=nofollow]' } },
+                    {
+                        'not': {
+                            'href_matches': [
+                                'checkout',
+                                'customer',
+                                'search',
+                                'catalogsearch',
+                                'product_compare',
+                                'wishlist'
+                            ]
+                        }
+                    }
+                ]
+            },
+            // Moderate is the best other one generate too much traffic on worker. and could increase $
+            'eagerness': 'conservative' // moderate, eager
+        }],
         'prefetch': [{ //prerender - is not recommended
             'source': 'document',
+            //"relative_to": "document",
             'where': {
                 'and': [
                     { 'href_matches': '/*' },
@@ -1253,6 +1330,8 @@ function processConfig() {
     // Prevent any cache invalidations - 100% static 
     GOD_MOD = getConfigValue("ENV_GOD_MOD", false);
 
+    FILTER_GET = getConfigValue("ENV_FILTER_GET", FILTER_GET, 'array');
+
     R2_STALE = getConfigValue("ENV_R2_STALE", R2_STALE);
 
     ADMIN_URL = getConfigValue("ENV_ADMIN_URL", 'admin', 'str');
@@ -1277,6 +1356,11 @@ function processConfig() {
     PWA_SPECULATION_VERSION = getConfigValue("ENV_PWA_SPECULATION_VERSION", PWA_SPECULATION_VERSION, 'int');
     PWA_MANIFEST = getConfigValue("ENV_PWA_MANIFEST", PWA_MANIFEST,
         'obj');
+
+    // set config by single Json file ENV_JSON_CONFIG {json} varriable 
+    // single ENV varrable has priority 
+    getENVConfigJson();
+
 }
 
 /**
@@ -1290,6 +1374,21 @@ async function syncKvConfig() {
     } catch (error) {
         console.log(error);
     }
+}
+
+async function getENVConfigJson() {
+    JSON_CONFIG = getConfigValue("ENV_JSON_CONFIG", JSON_CONFIG, 'obj');
+    if (Object.keys(JSON_CONFIG).length === 0) {
+        return false;
+    }
+    for (const [key, value] of Object.entries(JSON_CONFIG)) {
+        console.log(`ENV CONF JSON: ${key}: ${value}`);
+        //Checking if ENV variable are set. It has priority
+        if (typeof this["ENV_" + key] === "undefined") {
+            this[key] = value;
+        }
+    }
+    return true;
 }
 
 /**
@@ -1307,4 +1406,17 @@ async function fetchAndModifyHeaders(request, headers = []) {
         newResp.headers.set(header.name, header.value);
     }
     return newResp;
+}
+
+/**
+ * Hash
+ * 
+ * @param {String} string - string to hash
+ * @returns 
+ */
+async function hash(string) {
+    const myText = new TextEncoder().encode(string);
+    const myDigest = await crypto.subtle.digest({ name: 'SHA-256' }, myText);
+    const hashArray = Array.from(new Uint8Array(myDigest));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }

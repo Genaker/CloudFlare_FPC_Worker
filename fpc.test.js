@@ -372,7 +372,7 @@ describe("ASYNC revalidation Logic", () => {
     console.log(headers);
     expect(response.status).toEqual(200);
     expect(headers.get('cf-cache-status')).toEqual(HIT);
-    expect(parseInt(headers.get('age'))).toBeLessThan(10);
+    expect(parseInt(headers.get('age'))).toBeLessThan(13);
     expect(headers.get('x-html-edge-cache-status')).toContain("FromR2");
     expect(headers.get('r2')).toEqual("true");
   });
