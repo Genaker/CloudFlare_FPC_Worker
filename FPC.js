@@ -201,6 +201,7 @@ var GOD_MOD;
 // User will receive old/stale version
 var REVALIDATE_AGE;
 var R2_STALE = true;
+var R2_STALE = true;
 var TEST;
 
 var HTML_CACHE_VERSION = false;
