@@ -88,7 +88,6 @@ var FILTER_GET = [
     'uuid',
     'dicbo',
     'adgroupid',
-    '',
     // google related
     'g_keywordid',
     'g_keyword',
@@ -130,7 +129,8 @@ var FILTER_GET = [
     'cf-cdn',
     'r2-cdn',
     'cf-delete',
-    'cf-ttl'
+    'cf-ttl',
+    'cf-revalidate'
 ];
 
 var CACHE_STATUSES = [
@@ -201,7 +201,6 @@ var GOD_MOD;
 // User will receive old/stale version
 var REVALIDATE_AGE;
 var R2_STALE = true;
-var R2_STALE = true;
 var TEST;
 
 var HTML_CACHE_VERSION = false;
@@ -231,6 +230,7 @@ addEventListener("fetch", async event => {
         'CDN-ttl': 99999999999, // ttl to test revalidation
         'R2-miss': false, // Emulate cache miss on Page Reserve 
         'CDN-delete': false, // Delete page for test 
+        'CDN-revalidate': false,
         'set-version': "",
         'speculation': false,
         bypassCookies: false,
@@ -294,6 +294,10 @@ addEventListener("fetch", async event => {
     if (cacheUrl.searchParams.get('cf-delete') === "true") {
         context["CDN-delete"] = true;
         cacheUrl.searchParams.delete('cf-delete');
+    }
+    if (cacheUrl.searchParams.get('cf-revalidate') === "true") {
+        context["CDN-revalidate"] = true;
+        cacheUrl.searchParams.delete('cf-revalidate');
     }
     if (cacheUrl.searchParams.get('cf-ttl')) {
         context["CDN-ttl"] = parseInt(cacheUrl.searchParams.get('cf-ttl'));;
@@ -379,6 +383,12 @@ async function processRequest(originalRequest, context) {
     let getCachedTimeStart = Date.now();
     let { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways } = await getCachedResponse(originalRequest, context);
     let getCachedTimeEnd = Date.now();
+
+    // if revalidate request
+    if (context['CDN-revalidate']) {
+        response = null;
+        status += ",Revalidate,";
+    }
 
     // Request to purge cache by Adding Version
     if (originalRequest.url.indexOf('cf-purge') >= 0) {
@@ -523,6 +533,9 @@ async function processRequest(originalRequest, context) {
         }
         if (context['CDN-ttl'] < 9999) {
             response.headers.set('Custom-TTL', context['CDN-ttl'].toString());
+        }
+        if (context['CDN-revalidate']) {
+            response.headers.set('CDN-Revalidate', "1");
         }
 
         let getCacheTime = getCachedTimeEnd - getCachedTimeStart;
