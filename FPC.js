@@ -43,6 +43,14 @@ var DEFAULT_BYPASS_COOKIES = [
     //"X-Magento-Vary"
 ];
 
+var R2_CAHE_LOGGEDIN_USERS = false;
+const USER_COOKIES = [
+    'X-Magento-Vary'
+];
+
+const CSPRO_HEADER = 'content-security-policy-report-only';
+var CSPRO_REMOVE = false;
+
 var ADMIN_URL = null;
 
 // Filtered get parameters
@@ -136,7 +144,7 @@ var FILTER_GET = [
 var CACHE_STATUSES = [
     200,
     301,
-    302,
+    //302, Bots creats a lot of riddirects of this type. 
     //404
 ];
 
@@ -160,6 +168,7 @@ var BYPASS_URL = [
     'onestepcheckout',
     'admin',
     'checkout',
+    'catalogsearch',
     'paypal',
     'cart',
     'static',
@@ -576,6 +585,9 @@ async function processRequest(originalRequest, context) {
         response.headers.set("JS-Time", jsTime);
         response.headers.append('Server-Timing', 'js-time;desc="JS Execution Time";dur=' + jsTime);
         console.log("JS-Time: " + jsTime);
+        if (CSPRO_REMOVE) {
+            response.headers.delete(CSPRO_HEADER);
+        }
     }
     console.log("Return Response");
     //console.log("HTML:" + await response.clone().text());
@@ -610,26 +622,37 @@ function shouldBypassEdgeCache(request, response = null) {
         let bypassCookies = DEFAULT_BYPASS_COOKIES;
 
         //CAHE_LOGGEDIN_USERS
+        bypassCache = checkCookies(cookieHeader, bypassCookies);
+    }
 
-        if (cookieHeader && cookieHeader.length && bypassCookies.length) {
-            const cookies = cookieHeader.split(';');
-            for (let cookie of cookies) {
-                // See if the cookie starts with any of the cookies
-                // Example: token=29281ed8-3981-4840-a91e-382f9bd50dd2"
-                // = is added to match full cookie name
-                for (let prefix of bypassCookies) {
-                    if (cookie.trim().startsWith(prefix + "=")) {
-                        bypassCache = true;
-                        break;
-                    }
-                }
-                if (bypassCache) {
+    return bypassCache;
+}
+
+/**
+ * Check if some cookies is set
+ * 
+ * @param {String} cookieHeader 
+ * @param {array} bypassCookies 
+ */
+function checkCookies(cookieHeader, bypassCookies) {
+    let bypassCache = false;
+    if (cookieHeader && cookieHeader.length && bypassCookies.length) {
+        const cookies = cookieHeader.split(';');
+        for (let cookie of cookies) {
+            // See if the cookie starts with any of the cookies
+            // Example: token=29281ed8-3981-4840-a91e-382f9bd50dd2"
+            // = is added to match full cookie name
+            for (let prefix of bypassCookies) {
+                if (cookie.trim().startsWith(prefix + "=")) {
+                    bypassCache = true;
                     break;
                 }
             }
+            if (bypassCache) {
+                break;
+            }
         }
     }
-
     return bypassCache;
 }
 
@@ -1429,8 +1452,8 @@ async function fetchAndModifyHeaders(request, headers = []) {
  * @returns 
  */
 async function hash(string) {
-    const myText = new TextEncoder().encode(string);
-    const myDigest = await crypto.subtle.digest({ name: 'SHA-256' }, myText);
-    const hashArray = Array.from(new Uint8Array(myDigest));
+    const text = new TextEncoder().encode(string);
+    const digest = await crypto.subtle.digest({ name: 'SHA-256' }, text);
+    const hashArray = Array.from(new Uint8Array(digest));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }

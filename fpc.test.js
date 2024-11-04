@@ -496,3 +496,13 @@ describe("Speculation Rules Test", () => {
 describe("GOD_MOD tests", () => {
     test('PreFetch Url', () => {});
 })
+
+describe("Test Logged-In", () => {
+    test("Test Logged-In Bypass cookies", async () => {
+      let testHeaders = {'cookie' : "X-Magento-Vary=sdfsdfdsfdsf34234dsfsdfsdf;test=test;"};
+      const url = URL + "?sdsd=" + Date.now() + "&cf-cdn=false";
+      let response = await fetch(url, {headers: testHeaders});
+      expect(response.status).toEqual(200);
+      expect(response.headers.get('cf-cache-status')).toEqual(DYNAMIC);
+  });
+})
