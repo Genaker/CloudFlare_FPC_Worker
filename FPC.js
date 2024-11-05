@@ -48,6 +48,8 @@ const USER_COOKIES = [
     'X-Magento-Vary'
 ];
 
+const FORM_KEY = 'form_key';
+
 const CSPRO_HEADER = 'content-security-policy-report-only';
 var CSPRO_REMOVE = false;
 
@@ -242,6 +244,8 @@ addEventListener("fetch", async event => {
         'CDN-revalidate': false,
         'set-version': "",
         'speculation': false,
+        url: "",
+        cookies: "",
         bypassCookies: false,
         bypassUrl: false
     }
@@ -321,12 +325,14 @@ addEventListener("fetch", async event => {
 
     // Remove marketing GET parameters from the URL
     let normalizedUrl = normalizeUrl(cacheUrl);
+    context.url = normalizedUrl;
 
     const request = new Request(normalizedUrl.toString(), request0);
 
     console.log(request);
 
     let upstreamCache = request.headers.get('x-HTML-Edge-Cache');
+    context.cookies = request.headers.get('cookie');
     let specalationRequest = request.headers.get('Sec-Purpose');
     if (specalationRequest) {
         context['speculation'] = true;
@@ -600,7 +606,8 @@ async function processRequest(originalRequest, context) {
     if (SPECULATION_ENABLED && !bypassCache) {
         response.headers.set("Speculation-Rules", "\"/rules/speculation.json?v=" + PWA_SPECULATION_VERSION + "\"");
     }
-
+    //hash(await response.text(), context);
+    //new Error("Error");
     return response;
 }
 
@@ -973,7 +980,7 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
         }
     }
     return status;
-}
+} 
 
 /******************************************************************************
 * Utility Functions
@@ -1449,11 +1456,48 @@ async function fetchAndModifyHeaders(request, headers = []) {
  * Hash
  * 
  * @param {String} string - string to hash
+ * @param {*} context
  * @returns 
  */
-async function hash(string) {
-    const text = new TextEncoder().encode(string);
-    const digest = await crypto.subtle.digest({ name: 'SHA-256' }, text);
+async function hash(string, context) {
+    // Magento captcha issue fixed
+    /*const time = new Date();
+    let intTime = parseInt(time.getTime() / 10000000000);
+    let re = new RegExp(intTime + '.{5,25}', "g");
+    let form_key = getCookie(context.cookies, FORM_KEY);
+
+    string  = string.replace(re, '-*-*-*-*-1');
+    string  = string.replaceAll(context.url.search, '-*-*-*-*-2');
+    if (form_key !== "") {
+       string  = string.replaceAll(form_key, '-*-*-*-*-3');
+    }*/
+
+    //console.log(string);
+    let text = new TextEncoder().encode(string);
+    const digest = await crypto.subtle.digest({ name: 'SHA-1' }, text);
     const hashArray = Array.from(new Uint8Array(digest));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Get cookies by name
+ * 
+ * @param {String} cookies - cookies header string
+ * @param {String} name - name
+ * @returns String || null
+ */
+function getCookie(cookies, name) {
+    name = name + "=";
+    let decodedCookie = decodeURIComponent(cookies);
+    let ca = decodedCookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) == ' ') {
+            c = c.substring(1);
+        }
+        if (c.indexOf(name) == 0) {
+            return c.substring(name.length, c.length);
+        }
+    }
+    return null;
 }
