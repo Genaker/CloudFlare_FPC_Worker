@@ -123,7 +123,7 @@ Edit Code -> Insert Code From the Git
 Worker *Variable name* must be **KV**. KV name doesn't matter (Select from the drop-down)
 
 ![image](https://github.com/user-attachments/assets/8500a84b-931d-448f-9a7c-578e109399a4)
-Configure the **OTHER_HOST** (for example, google.com) variable to test workers through the worker domain. This will replace the worker domain with your staging or prod domain, and the server response will be fetched from there. 
+Configure the **OTHER_HOST** (for example, google.com) variable to test workers through the worker domain. This will replace the worker domain with your staging or prod domain, and the server response will be fetched from there. This variable is not required. 
 
 
 # Set your website route and worker to trigger:
