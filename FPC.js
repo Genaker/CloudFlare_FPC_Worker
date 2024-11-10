@@ -245,7 +245,8 @@ addEventListener("fetch", async event => {
         url: "",
         cookies: "",
         bypassCookies: false,
-        bypassUrl: false
+        bypassUrl: false,
+        error: ""
     }
     const request0 = event.request;
 
@@ -353,7 +354,8 @@ addEventListener("fetch", async event => {
     } else if (CLOUDFLARE_API.email.length && CLOUDFLARE_API.key.length && CLOUDFLARE_API.zone.length) {
         configured = true;
     } else {
-        throw Error("KV is not configured");
+        context.error += "KV is not configured";
+        console.log(context.error);
     }
     // temporary
     configured = true;
@@ -541,6 +543,9 @@ async function processRequest(originalRequest, context) {
         response.headers.set('Origin-Time', (originTimeEnd - originTimeStart).toString());
         response.headers.append('Server-Timing', 'fetch-origin;desc="Fetch From Origin";dur=' + (originTimeEnd - originTimeStart).toString());
 
+        if (context.error !== "") {
+            response.headers.set('CFW-Error', context.error);
+        }
         if (needsRevalidate) {
             response.headers.set('Stale', 'true');
         }
@@ -1050,6 +1055,8 @@ function getResponseCacheControl(response) {
 async function getCurrentCacheVersion(cacheVer) {
     if (HTML_CACHE_VERSION !== false) {
         return cacheVer = HTML_CACHE_VERSION;
+    } else if (typeof KV === 'undefined') {
+        return cacheVer = 1;
     }
     if (cacheVer === null) {
         if (typeof KV !== 'undefined') {
