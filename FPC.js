@@ -113,8 +113,6 @@ var FILTER_GET = [
     'cq_pos',
     'cq_med',
     'cq_plt',
-    '',
-    // 
     'b_adgroup',
     'b_adgroupid',
     'b_adid',
@@ -980,7 +978,7 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
         }
     }
     return status;
-} 
+}
 
 /******************************************************************************
 * Utility Functions
