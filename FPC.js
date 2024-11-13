@@ -12,6 +12,8 @@ var KV_CONFIG_CHECK = [];
 var KV_CONFIG = [];
 var JSON_CONFIG = {};
 
+var IP_count = [];
+
 //KV Config doesn't make sens. ENV var change automatically deploys new Worker version 
 var KV_CONFIG_ENABLED = false;
 
@@ -95,6 +97,9 @@ var FILTER_GET = [
     'hsa_net',
     'hsa_ver',
     'dm_i',
+    'dm_t',
+    'ref',
+    'trk',
     'uuid',
     'dicbo',
     'adgroupid',
@@ -133,6 +138,7 @@ var FILTER_GET = [
     'add',
     'srsltid', //new google parameter
     // worker specific
+    'click',
     'gtm_debug',
     'cf-cdn',
     'r2-cdn',
@@ -148,6 +154,7 @@ var CACHE_STATUSES = [
     //404
 ];
 
+var ALLOWED_GET_ONLY = false;
 //Whitelisted GET parameters
 var ALLOWED_GET = [
     'product_list_order',
@@ -246,7 +253,8 @@ addEventListener("fetch", async event => {
         cookies: "",
         bypassCookies: false,
         bypassUrl: false,
-        error: ""
+        error: "",
+        country: ""
     }
     const request0 = event.request;
 
@@ -259,6 +267,18 @@ addEventListener("fetch", async event => {
 
     const bypassCookies = shouldBypassEdgeCache(event.request);
     const bypassUrl = shouldBypassURL(request0);
+
+    const IP = event.request.headers.get('CF-Connecting-IP');
+
+    if (typeof event.request.cf.botManagement !== 'undefined') {
+        // Requires enterprise plan
+        const botScore = event.request.cf.botManagement.score;
+        console.log("BOT score: " + botScore.toString());
+    }
+    if (typeof event.request.cf.country !== 'undefined') {
+        context.country = event.request.cf.country;
+        console.log("Country: " + context.country);
+    }
 
     // Saving worker specific GET parameters to context before URL normalization
     if (bypassUrl || cacheUrl.searchParams.get('cfw') === "false" || bypassCookies) {
@@ -1168,8 +1188,15 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
  * @returns 
  */
 function normalizeUrl(url) {
-    for (var filter of FILTER_GET) {
-        url.searchParams.delete(filter);
+    if (ALLOWED_GET_ONLY) {
+        for (var key of url.searchParams.keys()) {
+            if (typeof ALLOWED_GET[key] === 'undefined')
+                url.searchParams.delete(key);
+        }
+    } else {
+        for (var filter of FILTER_GET) {
+            url.searchParams.delete(filter);
+        }
     }
     return url;
 }
@@ -1391,6 +1418,8 @@ function processConfig() {
     REVALIDATE_AGE = getConfigValue("ENV_REVALIDATE_AGE", 360, 'int');
 
     CUSTOM_CORS = getConfigValue("ENV_CUSTOM_CORS", [], 'array');
+    ALLOWED_GET = getConfigValue("ENV_ALLOWED_GET", ALLOWED_GET, 'array');
+    ALLOWED_GET_ONLY = getConfigValue("ENV_ALLOWED_GET_ONLY", ALLOWED_GET_ONLY);
 
     PWA_ENABLED = getConfigValue("ENV_PWA_ENABLED", PWA_ENABLED);
 
