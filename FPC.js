@@ -629,7 +629,7 @@ async function processRequest(originalRequest, context) {
     console.log("Return Response");
     //console.log("HTML:" + await response.clone().text());
     //console.log("HTML size:" + (await response.clone().arrayBuffer()).byteLength / 1000 + "Kb");
-   
+
     //hash(await response.text(), context);
     //new Error("Error");
     return response;
