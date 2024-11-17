@@ -53,7 +53,7 @@ const USER_COOKIES = [
 const FORM_KEY = 'form_key';
 
 const CSPRO_HEADER = 'content-security-policy-report-only';
-var CSPRO_REMOVE = false;
+var CSPRO_REMOVE = true;
 
 var ADMIN_URL = null;
 
@@ -178,10 +178,10 @@ var BYPASS_URL = [
     'catalogsearch',
     'paypal',
     'cart',
-    'static',
-    'media',
+    'static/',
+    'media/',
     'api',
-    'rest',
+    'rest/',
     'ajax',
     'frontend_action',
     'searchspring',
@@ -617,18 +617,19 @@ async function processRequest(originalRequest, context) {
         if (CSPRO_REMOVE) {
             response.headers.delete(CSPRO_HEADER);
         }
+        if (CUSTOM_PRELOAD.length != 0) {
+            CUSTOM_PRELOAD.forEach((preload) => {
+                response.headers.set("Link", preload);
+            })
+        }
+        if (SPECULATION_ENABLED && !bypassCache) {
+            response.headers.set("Speculation-Rules", "\"/rules/speculation.json?v=" + PWA_SPECULATION_VERSION + "\"");
+        }
     }
     console.log("Return Response");
     //console.log("HTML:" + await response.clone().text());
     //console.log("HTML size:" + (await response.clone().arrayBuffer()).byteLength / 1000 + "Kb");
-    if (CUSTOM_PRELOAD.length != 0) {
-        CUSTOM_PRELOAD.forEach((preload) => {
-            response.headers.set("Link", preload);
-        })
-    }
-    if (SPECULATION_ENABLED && !bypassCache) {
-        response.headers.set("Speculation-Rules", "\"/rules/speculation.json?v=" + PWA_SPECULATION_VERSION + "\"");
-    }
+   
     //hash(await response.text(), context);
     //new Error("Error");
     return response;
@@ -1190,7 +1191,7 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
 function normalizeUrl(url) {
     if (ALLOWED_GET_ONLY) {
         for (var key of url.searchParams.keys()) {
-            if (typeof ALLOWED_GET[key] === 'undefined')
+            if (!ALLOWED_GET.includes(key))
                 url.searchParams.delete(key);
         }
     } else {
