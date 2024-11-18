@@ -35,6 +35,9 @@ describe("FPC TESTS", () => {
       process.exit(1);
     }
     expect(response.status).toEqual(200);
+    if (response.status !== 200) {
+      process.exit("Server Response Error - Fix Server first");
+    }
     expect(headers.get('x-html-edge-cache-version')).not.toEqual(null);
     beforeTestVersion = headers.get('x-html-edge-cache-version');
     expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
@@ -143,7 +146,7 @@ describe("FPC TESTS", () => {
     const url = URL + uniqueParam;
     let response = await fetch(url + deleteFromCDN);
     const headers = response.headers;
-    console.log(url  + deleteFromCDN);
+    console.log(url + deleteFromCDN);
     console.log(response);
     console.log(headers);
     const cacheVersion = parseInt(headers.get('x-html-edge-cache-version'));
@@ -167,7 +170,7 @@ describe("FPC TESTS", () => {
     // expect(headers.get('r2')).toEqual("true");
   });
 
- 
+
 
   uniqueParam = "?test-param=" + Date.now();
 
@@ -358,8 +361,10 @@ describe("ASYNC revalidation Logic", () => {
     console.log(headers);
     expect(response.status).toEqual(200);
     expect(headers.get('cf-cache-status')).toEqual(HIT);
-    let status = "Hit,Refreshed";
-    expect(headers.get('x-html-edge-cache-status')).toContain(status);
+    let status1 = "Hit";
+    let status2 = "Refreshed";
+    expect(headers.get('x-html-edge-cache-status')).toContain(status1);
+    expect(headers.get('x-html-edge-cache-status')).toContain(status2);
     expect(headers.get('custom-ttl')).toContain("1");
   });
   test("Fetch Without CDN ", async () => {
@@ -454,56 +459,56 @@ describe("Test R2 Stale", () => {
 });
 
 describe("Restore CF Version", () => {
-// restore version
+  // restore version
   test("Set Version Back", async () => {
-  const restoreVersionURL = URL + "?cf-version=" + beforeTestVersion;
-  let response = await fetch(URL + restoreVersionURL);
-  expect(response.status).toEqual(223);
-  expect(response.headers.get('cache-version')).toContain(beforeTestVersion);
+    const restoreVersionURL = URL + "?cf-version=" + beforeTestVersion;
+    let response = await fetch(URL + restoreVersionURL);
+    expect(response.status).toEqual(223);
+    expect(response.headers.get('cache-version')).toContain(beforeTestVersion);
   });
 
   test("Check Version", async () => {
-  response = await fetch(URL + "?dfghgdfhgfh=" + Date.now());
-  expect(response.headers.get('x-html-edge-cache-version')).toEqual(beforeTestVersion);
+    response = await fetch(URL + "?dfghgdfhgfh=" + Date.now());
+    expect(response.headers.get('x-html-edge-cache-version')).toEqual(beforeTestVersion);
   })
 })
 
 
 describe("Speculation Rules Test", () => {
   // restore version
-    test("Check no return if not cached", async () => {
-    let testHeaders = {'Sec-Purpose' : "prerender"};
+  test("Check no return if not cached", async () => {
+    let testHeaders = { 'Sec-Purpose': "prerender" };
     const url = URL + "?sdsd=" + Date.now();
-    let response = await fetch(url, {headers: testHeaders});
+    let response = await fetch(url, { headers: testHeaders });
     expect(response.status).toEqual(406);
-    });
+  });
 
-    test("Check if not cache response is not cached", async () => {
-      let testHeaders = {'Sec-Purpose' : "prerender"};
-      const url = URL + "?sdsd=" + Date.now();
-      let response = await fetch(url);
-      expect(response.status).toEqual(200);
-      });
-  
-    test("Check if cached", async () => {
+  test("Check if not cache response is not cached", async () => {
+    let testHeaders = { 'Sec-Purpose': "prerender" };
+    const url = URL + "?sdsd=" + Date.now();
+    let response = await fetch(url);
+    expect(response.status).toEqual(200);
+  });
+
+  test("Check if cached", async () => {
     response = await fetch(preheatedUrl);
     expect(response.status).toEqual(200);
     expect(headers.get('cf-cache-status')).toEqual(HIT);
     expect(response.headers.get('x-html-edge-cache-version')).toEqual(beforeTestVersion);
-    })
   })
+})
 
 describe("GOD_MOD tests", () => {
-    test('PreFetch Url', () => {});
+  test('PreFetch Url', () => { });
 })
 
 describe("Test Logged-In", () => {
-    test("Test Logged-In Bypass cookies", async () => {
-      let testHeaders = {'cookie' : "X-Magento-Vary=sdfsdfdsfdsf34234dsfsdfsdf;test=test;"};
-      const url = URL + "?sdsd=" + Date.now() + "&cf-cdn=false";
-      let response = await fetch(url, {headers: testHeaders});
-      expect(response.status).toEqual(200);
-      expect(response.headers.get('cf-cache-status')).toEqual(DYNAMIC);
+  test("Test Logged-In Bypass cookies", async () => {
+    let testHeaders = { 'cookie': "X-Magento-Vary=sdfsdfdsfdsf34234dsfsdfsdf;test=test;" };
+    const url = URL + "?sdsd=" + Date.now() + "&cf-cdn=false";
+    let response = await fetch(url, { headers: testHeaders });
+    expect(response.status).toEqual(200);
+    expect(response.headers.get('cf-cache-status')).toEqual(DYNAMIC);
   });
 })
 
@@ -518,7 +523,7 @@ describe("Test HASH", () => {
     console.log(URL + GET);
     console.log(response);
     console.log(headers);
-   
+
     expect(response.status).toEqual(200);
     expect(headers.get('r2-hash')).toBeNull();
     expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
@@ -552,7 +557,7 @@ describe("Test HASH", () => {
     console.log(headers);
     expect(response.status).toEqual(200);
     expect(headers.get('r2-hash')).not.toBeNull();
-    expect(headers.get('r2-hash')).toEqual(hash); 
+    expect(headers.get('r2-hash')).toEqual(hash);
     expect(headers.get('r2-time')).toEqual(r2Time);
     expect(headers.get('cf-cache-status')).toEqual(HIT);
     let status = "Hit,Refreshed";
