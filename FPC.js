@@ -464,7 +464,13 @@ async function processRequest(originalRequest, context) {
 
         console.log("Not From Cache");
         // Clone the request, add the edge-cache header and send it through.
-        let request = new Request(originalRequest);
+        let request = new Request(originalRequest, {
+            headers: {
+                ...Object.fromEntries(originalRequest.headers.entries()),
+                "Accept-Encoding": "br, gzip", // Request both Brotli and Gzip support
+            },
+        });
+
         request.headers.set('x-HTML-Edge-Cache', 'supports=cache|purgeall|bypass-cookies');
 
         status += ',FetchedOrigin,';
@@ -479,6 +485,8 @@ async function processRequest(originalRequest, context) {
                 // cacheEverything: true
             },
         });
+        const compression = response.headers.get("Content-Encoding");
+        console.log("Compres: " + compression);
         originTimeEnd = Date.now();
         console.log("Origin-Time:" + (originTimeEnd - originTimeStart).toString());
         if (ENABLE_ESI_BLOCKS) {
@@ -629,7 +637,7 @@ async function processRequest(originalRequest, context) {
     console.log("Return Response");
     //console.log("HTML:" + await response.clone().text());
     //console.log("HTML size:" + (await response.clone().arrayBuffer()).byteLength / 1000 + "Kb");
-   
+
     //hash(await response.text(), context);
     //new Error("Error");
     return response;
