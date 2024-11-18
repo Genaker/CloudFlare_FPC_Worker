@@ -564,14 +564,11 @@ async function processRequest(originalRequest, context) {
             }
         }
     }
-
     if (response && status !== null && originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
         let cloneStart = Date.now();
         response = new Response(response.clone().body, response);
         let cloneEnd = Date.now();
         response.headers.append('Server-Timing', 'clone-response;desc="Clone Main Response";dur=' + (cloneEnd - cloneStart).toString());
-
-        response.headers.set('Origin-Time', (originTimeEnd - originTimeStart).toString());
         response.headers.set('Origin-Time', (originTimeEnd - originTimeStart).toString());
         response.headers.append('Server-Timing', 'fetch-origin;desc="Fetch From Origin";dur=' + (originTimeEnd - originTimeStart).toString());
 
