@@ -566,8 +566,12 @@ async function processRequest(originalRequest, context) {
     }
 
     if (response && status !== null && originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
-        let responseBody = response.clone().body;
-        response = new Response(responseBody, response);
+        let cloneStart = Date.now();
+        response = new Response(response.clone().body, response);
+        let cloneEnd = Date.now();
+        response.headers.append('Server-Timing', 'clone-response;desc="Clone Main Response";dur=' + (cloneEnd - cloneStart).toString());
+
+        response.headers.set('Origin-Time', (originTimeEnd - originTimeStart).toString());
         response.headers.set('Origin-Time', (originTimeEnd - originTimeStart).toString());
         response.headers.append('Server-Timing', 'fetch-origin;desc="Fetch From Origin";dur=' + (originTimeEnd - originTimeStart).toString());
 
@@ -814,8 +818,10 @@ async function getCachedResponse(request, context) {
                 });
                 deleted = true;
             }
-
+            let cacheGetStart = 0;
+            let cacheGetEnd = 0;
             if (!deleted) {
+                cacheGetStart = Date.now();
                 // check the previous version of the cache before purge and soft revalidate
                 // requestin in advance to save time 
                 staleCachePromise = cache.match(staleCacheKeyRequest);
@@ -825,6 +831,7 @@ async function getCachedResponse(request, context) {
                     cachedResponse = await Promise.resolve(staleCachePromise);
                     needsRevalidate = true;
                 }
+                cacheGetEnd = Date.now();
             }
 
             let requestUrl = new URL(request.url);
@@ -843,6 +850,8 @@ async function getCachedResponse(request, context) {
             if (cachedResponse) {
                 // Copy Response object so that we can edit headers.
                 cachedResponse = new Response(cachedResponse.body, cachedResponse);
+
+                cachedResponse.headers.append('Server-Timing', 'cache-get-time;desc="Get Local CDN CACHE";dur=' + (cacheGetEnd - cacheGetStart).toString());
                 if (needsRevalidate) {
                     cachedResponse.headers.set('stale-version', (cacheVer - 1).toString());
                 }
