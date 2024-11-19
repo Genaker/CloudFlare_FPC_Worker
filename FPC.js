@@ -252,6 +252,7 @@ addEventListener("fetch", async event => {
         url: "",
         cookies: "",
         bypassCookies: false,
+        bypassCache: false,
         bypassUrl: false,
         error: "",
         country: ""
@@ -485,6 +486,7 @@ async function processRequest(originalRequest, context) {
                 // cacheEverything: true
             },
         });
+
         const compression = response.headers.get("Content-Encoding");
         console.log("Compres: " + compression);
         originTimeEnd = Date.now();
@@ -518,8 +520,9 @@ async function processRequest(originalRequest, context) {
             //Cache everything by default
             //if(options === null) options.cache = true;
 
+            // We also need check HEAD because of the curl issue. 
             if ((!options || options.cache) && isHTML &&
-                originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) &&
+                ['GET', 'HEAD'].includes(originalRequest.method) && CACHE_STATUSES.includes(response.status) &&
                 !bypassCache) {
                 console.log("Caching...");
                 status += ",Caching Async,";
@@ -543,7 +546,7 @@ async function processRequest(originalRequest, context) {
             status += ',Stale,';
             console.log("Hit from the previous version Needs Revalidate: Current V: " + cacheVer + " Previous: " + (cacheVer - 1))
         }
-        if (originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
+        if (['GET', 'HEAD'].includes(originalRequest.method) && CACHE_STATUSES.includes(response.status) && isHTML) {
             bypassCache = bypassCache || context.bypassCookies;
             if (needsRevalidate || !bypassCache) {
                 const options = getResponseOptions(response);
@@ -564,11 +567,12 @@ async function processRequest(originalRequest, context) {
             }
         }
     }
-    if (response && status !== null && originalRequest.method === 'GET' && CACHE_STATUSES.includes(response.status) && isHTML) {
+    if (response && status !== null && ['GET', 'HEAD'].includes(originalRequest.method) && CACHE_STATUSES.includes(response.status) && isHTML) {
         let cloneStart = Date.now();
         response = new Response(response.clone().body, response);
         let cloneEnd = Date.now();
         response.headers.append('Server-Timing', 'clone-response;desc="Clone Main Response";dur=' + (cloneEnd - cloneStart).toString());
+
         response.headers.set('Origin-Time', (originTimeEnd - originTimeStart).toString());
         response.headers.append('Server-Timing', 'fetch-origin;desc="Fetch From Origin";dur=' + (originTimeEnd - originTimeStart).toString());
 
@@ -586,7 +590,7 @@ async function processRequest(originalRequest, context) {
         }
 
         let getCacheTime = getCachedTimeEnd - getCachedTimeStart;
-        response.headers.set('Cache-Check-Time', getCacheTime.toString());
+        response.headers.set('Cache-Time', getCacheTime.toString());
         response.headers.append('Server-Timing', 'get-cache;desc="Get CF CDN CACHE";dur=' + getCacheTime.toString());
 
         status = status.replaceAll(",,", ",");
@@ -786,7 +790,7 @@ async function getCachedResponse(request, context) {
     status = 'No-Cache';
     }*/
 
-    if (!bypassCache && !noCache && request.method === 'GET' /*&& accept && accept.indexOf('text/html') >= 0*/) {
+    if (!bypassCache && !noCache && ['GET', 'HEAD'].includes(request.method) /*&& accept && accept.indexOf('text/html') >= 0*/) {
         // Build the versioned URL for checking the cache
         cacheVer = await getCurrentCacheVersion(cacheVer);
         console.log("Getting from cache:");
@@ -974,7 +978,7 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
     let status = "";
     const accept = request.headers.get(ACCEPT_CONTENT_HEADER);
     console.log("ACCEPT_CONTENT_HEADER: " + accept);
-    if (request.method === 'GET' && CACHE_STATUSES.includes(originalResponse.status) /*&& accept && accept.indexOf('text/html') >= 0*/) {
+    if (['GET', 'HEAD'].includes(request.method) && CACHE_STATUSES.includes(originalResponse.status) /*&& accept && accept.indexOf('text/html') >= 0*/) {
         cacheVer = await getCurrentCacheVersion(cacheVer);
         const cacheKeyRequest = GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways);
 
