@@ -56,6 +56,7 @@ const CSPRO_HEADER = 'content-security-policy-report-only';
 var CSPRO_REMOVE = true;
 
 var ADMIN_URL = null;
+var BODY_MIN_SIZE = 3 * 1024;
 
 // Filtered get parameters
 var FILTER_GET = [
@@ -514,6 +515,7 @@ async function processRequest(originalRequest, context) {
                 status += ',Purged,';
             }
             bypassCache = context.bypassCache; //|| shouldBypassEdgeCache(request, response);
+
             console.log("bypassCache: " + bypassCache);
             console.log("options: " + options);
 
@@ -872,6 +874,10 @@ async function getCachedResponse(request, context) {
                 status += ',Hit,';
                 console.log(status);
                 cachedResponse.headers.delete('Cache-Control');
+
+                if (cachedResponse.headers.get('R2-Status')) {
+                    cachedResponse.status = parseInt(cachedResponse.headers.get('R2-Status'));
+                }
                 if (!fromR2) {
                     cachedResponse.headers.delete('R2-Status');
                     cachedResponse.headers.delete('R2-Time');
@@ -988,6 +994,16 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
             // Create a new response object based on the clone that we can edit.
             let cache = caches.default;
             let clonedResponse = originalResponse.clone();
+            // check response length but requires Content-Length header
+            if (clonedResponse && parseInt(clonedResponse.headers.get('Content-Length')) < BODY_MIN_SIZE) {
+                console.log("BYPASSBYSIZE: " + clonedResponse.headers.get('Content-Length'));
+                return status += "BYPASSBYSIZE";
+            }
+            /*if (clonedResponse && clonedResponse.status === 200) {
+                if (await checkBodySize(clonedResponse) === false) {
+                        return status += "BYPASSBYSIZE";
+                }
+            }*/
             //originalResponse.body.cancel();
             let response = new Response(clonedResponse.body, clonedResponse);
             for (let header of CACHE_HEADERS) {
@@ -1518,7 +1534,7 @@ async function hash(string, context) {
     let intTime = parseInt(time.getTime() / 10000000000);
     let re = new RegExp(intTime + '.{5,25}', "g");
     let form_key = getCookie(context.cookies, FORM_KEY);
-
+  
     string  = string.replace(re, '-*-*-*-*-1');
     string  = string.replaceAll(context.url.search, '-*-*-*-*-2');
     if (form_key !== "") {
@@ -1553,4 +1569,27 @@ function getCookie(cookies, name) {
         }
     }
     return null;
+}
+
+/**
+ * Check response body size
+ * 
+ * @param {Response} clonedResponse - response to check size
+ * @param {number} limitInKBytes  - Kb limit with default value BODY_MIN_SIZE
+ * @returns 
+ */
+async function checkBodySize(clonedResponse, limitInKBytes = BODY_MIN_SIZE) {
+    let size = 0;
+    const reader = clonedResponse.body.getReader();
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > limitInKBytes) {
+            return true; // Early exit if size exceeds the limit
+        }
+    }
+    if (size < limitInKBytes) {
+        return false;
+    }
 }
