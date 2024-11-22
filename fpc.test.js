@@ -513,7 +513,7 @@ describe("Test Logged-In", () => {
 })
 
 describe("Test HASH", () => {
-  GET = "?dfsd=" + Date.now();
+  GET = "?randome=" + Date.now();
   let hash = "";
   let r2Time = null;
   test('Pre Fetch', async () => {
@@ -564,5 +564,48 @@ describe("Test HASH", () => {
     expect(headers.get('x-html-edge-cache-status')).toContain(status);
     expect(headers.get('custom-ttl')).toContain("1");
   });
-}
-)
+})
+
+
+describe("301 redirect test", () => {
+  GET2 = "/about-tilebar/?dfsd=" + Date.now();
+  test('Pre Fetch  301', async () => {
+    //warm up cache
+    let response = await fetch(URL + GET2, { redirect: "manual" });
+    let headers = response.headers;
+    console.log(URL + GET2);
+    console.log(response);
+    console.log(headers);
+
+    expect(response.status).toEqual(301);
+    expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
+    expect(headers.get('x-html-edge-cache-status')).toContain("Miss,FetchedOrigin,CachingAsync");
+  });
+
+  test("301 redirect ", async () => {
+    await new Promise((r) => setTimeout(r, 4000));
+    response = await fetch(URL + GET2, { redirect: "manual" });
+    headers = response.headers;
+    console.log(URL + GET2);
+    console.log(response);
+    console.log(headers);
+    expect(response.status).toEqual(301);
+    expect(headers.get('cf-cache-status')).toEqual(HIT);
+    let status = "Hit,Stale";
+    expect(headers.get('x-html-edge-cache-status')).toContain(status);
+  });
+
+  test("301 redirect R2", async () => {
+    await new Promise((r) => setTimeout(r, 4000));
+    response = await fetch(URL + GET2 + "&cf-cdn=false", { redirect: "manual" });
+    headers = response.headers;
+    console.log(URL + GET2);
+    console.log(response);
+    console.log(headers);
+    expect(response.status).toEqual(301);
+    expect(headers.get('r2')).toEqual("true");
+    expect(headers.get('cf-cache-status')).toEqual(HIT);
+    let status = "FromR2,SavedCDNasync,Hit";
+    expect(headers.get('x-html-edge-cache-status')).toContain(status);
+  });
+})
