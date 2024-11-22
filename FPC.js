@@ -491,7 +491,9 @@ async function processRequest(originalRequest, context) {
         const compression = response.headers.get("Content-Encoding");
         console.log("Compres: " + compression);
         originTimeEnd = Date.now();
-        console.log("Origin-Time:" + (originTimeEnd - originTimeStart).toString());
+        if (originTimeEnd - originTimeStart > 0) {
+            console.log("Origin-Time:" + (originTimeEnd - originTimeStart).toString());
+        }
         if (ENABLE_ESI_BLOCKS) {
             let newBody = await processESI(response, context);
             response = new Response(newBody, response);
@@ -993,17 +995,20 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
             // First, clone the response so there is a parallel body stream and then
             // Create a new response object based on the clone that we can edit.
             let cache = caches.default;
+            let bodySizeTime = 0;
             let clonedResponse = originalResponse.clone();
             // check response length but requires Content-Length header
-            if (clonedResponse && parseInt(clonedResponse.headers.get('Content-Length')) < BODY_MIN_SIZE) {
-                console.log("BYPASSBYSIZE: " + clonedResponse.headers.get('Content-Length'));
-                return status += "BYPASSBYSIZE";
-            }
-            /*if (clonedResponse && clonedResponse.status === 200) {
-                if (await checkBodySize(clonedResponse) === false) {
-                        return status += "BYPASSBYSIZE";
+            if (clonedResponse && clonedResponse.status === 200) {
+                if (parseInt(clonedResponse.headers.get('Content-Length')) < BODY_MIN_SIZE) {
+                    console.log("BYPASSBYSIZE: " + clonedResponse.headers.get('Content-Length'));
+                    return status += "BYPASSBYSIZE";
                 }
-            }*/
+                const bodyTimeStart = Date.now();
+                if (await checkBodySize(clonedResponse.clone(), BODY_MIN_SIZE) === false) {
+                    return status += "BYPASSBYSIZE";
+                }
+                bodySizeTime = bodyTimeStart - Date.now();
+            }
             //originalResponse.body.cancel();
             let response = new Response(clonedResponse.body, clonedResponse);
             for (let header of CACHE_HEADERS) {
@@ -1012,6 +1017,10 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
                     response.headers.delete(header);
                     response.headers.set('x-HTML-Edge-Cache-Header-' + header, value);
                 }
+            }
+            if (bodySizeTime > 0) {
+                // Time to check response body size 
+                response.headers.set('Size-Time', bodySizeTime.toString());
             }
             response.headers.delete('Set-Cookie');
             response.headers.delete('Cache-Control');
@@ -1218,24 +1227,45 @@ function GenerateCacheRequestUrlKey(request, cacheVer, cacheAlways) {
 }
 
 /**
- * Normalize url 
- * @param {url} url - original url
- * @returns 
+ * Normalize URL by removing unwanted query parameters and duplicates.
+ *
+ * @param {URL} url - Original URL object to normalize.
+ * @returns {URL} - Normalized URL object.
  */
 function normalizeUrl(url) {
+    // Create a new URL object to avoid modifying the original
+    const normalizedUrl = new URL(url.toString());
+
+    // Handle allowed-only or filtered parameters
     if (ALLOWED_GET_ONLY) {
-        for (var key of url.searchParams.keys()) {
-            if (!ALLOWED_GET.includes(key))
-                url.searchParams.delete(key);
-        }
+        // Remove all query parameters not in ALLOWED_GET
+        [...normalizedUrl.searchParams.keys()].forEach((key) => {
+            if (!ALLOWED_GET.includes(key)) {
+                normalizedUrl.searchParams.delete(key);
+            }
+        });
     } else {
-        for (var filter of FILTER_GET) {
-            url.searchParams.delete(filter);
+        // Remove query parameters listed in FILTER_GET
+        FILTER_GET.forEach((key) => {
+            normalizedUrl.searchParams.delete(key);
+        });
+    }
+
+    // Remove duplicate query parameters
+    const uniqueParams = new URLSearchParams();
+    for (const [key, value] of normalizedUrl.searchParams.entries()) {
+        if (!uniqueParams.has(key)) {
+            uniqueParams.append(key, value);
         }
     }
-    return url;
-}
+    normalizedUrl.search = uniqueParams.toString();
 
+    // Ensure consistent formatting by removing trailing slashes
+    //normalizedUrl.pathname = normalizedUrl.pathname.replace(/\/+$/, "");
+
+    // Return the normalized URL
+    return normalizedUrl;
+}
 /**
  * ESI(Edge Side Include) tags processing 
  * 
