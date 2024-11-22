@@ -1252,13 +1252,22 @@ function normalizeUrl(url) {
     }
 
     // Remove duplicate query parameters
-    const uniqueParams = new URLSearchParams();
+    const uniqueParams = new Map();
     for (const [key, value] of normalizedUrl.searchParams.entries()) {
         if (!uniqueParams.has(key)) {
-            uniqueParams.append(key, value);
+            uniqueParams.set(key, value);
         }
     }
-    normalizedUrl.search = uniqueParams.toString();
+
+    // Sort parameters alphabetically
+    const sortedParams = new URLSearchParams();
+    [...uniqueParams.entries()]
+        .sort(([keyA], [keyB]) => keyA.localeCompare(keyB)) // Sort by key
+        .forEach(([key, value]) => {
+            sortedParams.append(key, value);
+        });
+
+    normalizedUrl.search = sortedParams.toString();
 
     // Ensure consistent formatting by removing trailing slashes
     //normalizedUrl.pathname = normalizedUrl.pathname.replace(/\/+$/, "");
