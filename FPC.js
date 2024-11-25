@@ -218,6 +218,8 @@ var GOD_MOD;
 // User will receive old/stale version
 var REVALIDATE_AGE;
 var R2_STALE = true;
+// Send R2 and Server response semultaniosly and use which one will be recieved first
+var R2_SERVER_REQUEST = true;
 var TEST;
 
 var HTML_CACHE_VERSION = false;
@@ -243,6 +245,9 @@ addEventListener("fetch", async event => {
         event: event,
         promise: null,
         'r2-stale': false,
+        'r2-cache': false,
+        'r2-server-first': false,
+        'r2-use-stale': false,
         'CDN-miss': false, // emulate cache miss on CDN
         'CDN-ttl': 99999999999, // ttl to test revalidation
         'R2-miss': false, // Emulate cache miss on Page Reserve 
@@ -580,6 +585,10 @@ async function processRequest(originalRequest, context) {
         response.headers.set('Origin-Time', (originTimeEnd - originTimeStart).toString());
         response.headers.append('Server-Timing', 'fetch-origin;desc="Fetch From Origin";dur=' + (originTimeEnd - originTimeStart).toString());
 
+        if (['r2-null-server', 'server-first', 'miss'].includes(context['r2-cache'])) {
+            // If Server was used insead of R2
+            response.headers.set('R2', context['r2-cache']);
+        }
         if (context.error !== "") {
             response.headers.set('CFW-Error', context.error);
         }
@@ -833,7 +842,7 @@ async function getCachedResponse(request, context) {
                 cachedResponse = await cache.match(cacheKeyRequest);
                 if (!cachedResponse) {
                     // Return the previous version of the cache ...
-                    cachedResponse = await Promise.resolve(staleCachePromise);
+                    cachedResponse = await staleCachePromise;
                     needsRevalidate = true;
                 }
                 cacheGetEnd = Date.now();
@@ -1496,6 +1505,7 @@ function processConfig() {
     ALLOWED_GET_ONLY = getConfigValue("ENV_ALLOWED_GET_ONLY", ALLOWED_GET_ONLY);
 
     PWA_ENABLED = getConfigValue("ENV_PWA_ENABLED", PWA_ENABLED);
+    R2_SERVER_REQUEST = getConfigValue("ENV_R2_SERVER_REQUEST", R2_SERVER_REQUEST);
 
     CUSTOM_PRELOAD = getConfigValue("ENV_CUSTOM_PRELOAD", [
         "<https://fonts.gstatic.com>; rel=preconnect",
