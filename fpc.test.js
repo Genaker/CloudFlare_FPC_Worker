@@ -526,6 +526,22 @@ describe("Test HASH", () => {
 
     expect(response.status).toEqual(200);
     expect(headers.get('r2-hash')).toBeNull();
+    expect(headers.get('r2-promise')).toEqual("1");
+    expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
+    expect(headers.get('x-html-edge-cache-status')).toContain("Miss,FetchedOrigin,CachingAsync");
+  });
+
+  test('Pre Fetch without Race ', async () => {
+    //warm up cache
+    let response = await fetch(URL + GET + "&aa=bb&r2-race=0");
+    let headers = response.headers;
+    console.log(URL + GET);
+    console.log(response);
+    console.log(headers);
+
+    expect(response.status).toEqual(200);
+    expect(headers.get('r2-hash')).toBeNull();
+    expect(headers.get('r2-promise')).toBeNull();
     expect(headers.get('cf-cache-status')).toEqual(DYNAMIC);
     expect(headers.get('x-html-edge-cache-status')).toContain("Miss,FetchedOrigin,CachingAsync");
   });
