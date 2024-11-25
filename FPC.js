@@ -1663,7 +1663,6 @@ async function checkBodySize(clonedResponse, limitInKBytes = BODY_MIN_SIZE) {
     }
 }
 
-
 /**
  * Parse Boolean
  * 
