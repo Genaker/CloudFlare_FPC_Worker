@@ -219,7 +219,7 @@ var GOD_MOD;
 var REVALIDATE_AGE;
 var R2_STALE = true;
 // Send R2 and Server response semultaniosly and use which one will be recieved first
-var R2_SERVER_REQUEST = true;
+var R2_SERVER_RACE = true;
 var TEST;
 
 var HTML_CACHE_VERSION = false;
@@ -244,6 +244,7 @@ addEventListener("fetch", async event => {
     let context = {
         event: event,
         promise: null,
+        'r2-race': R2_SERVER_RACE,
         'r2-stale': false,
         'r2-cache': false,
         'r2-server-first': false,
@@ -261,7 +262,8 @@ addEventListener("fetch", async event => {
         bypassCache: false,
         bypassUrl: false,
         error: "",
-        country: ""
+        country: "",
+        serverPromise: null
     }
     const request0 = event.request;
 
@@ -341,6 +343,11 @@ addEventListener("fetch", async event => {
     if (cacheUrl.searchParams.get('cf-ttl')) {
         context["CDN-ttl"] = parseInt(cacheUrl.searchParams.get('cf-ttl'));;
         cacheUrl.searchParams.delete('cf-ttl');
+    }
+    if (cacheUrl.searchParams.get('r2-race')) {
+        context["r2-race"] = parseBoolean(cacheUrl.searchParams.get('r2-race'));
+        R2_SERVER_RACE = parseBoolean(cacheUrl.searchParams.get('r2-race'));
+        cacheUrl.searchParams.delete('r2-race');
     }
 
     // Hostname for a different zone
@@ -482,16 +489,21 @@ async function processRequest(originalRequest, context) {
 
         status += ',FetchedOrigin,';
         originTimeStart = Date.now();
-
-        // Fetch it from origin
-        response = await fetch(request, {
-            cf: {
-                // Always cache this fetch regardless of content type
-                // for a max of 15 seconds before revalidating the resource
-                // cacheTtl: 15,
-                // cacheEverything: true
-            },
-        });
+        // if we still have promise from R2... 
+        if (context.serverPromise !== null) {
+            response = await context.serverPromise;
+        }
+        if (!response) {
+            // Fetch it from origin
+            response = await fetch(request, {
+                cf: {
+                    // Always cache this fetch regardless of content type
+                    // for a max of 15 seconds before revalidating the resource
+                    // cacheTtl: 15,
+                    // cacheEverything: true
+                },
+            });
+        }
 
         const compression = response.headers.get("Content-Encoding");
         console.log("Compres: " + compression);
@@ -542,6 +554,8 @@ async function processRequest(originalRequest, context) {
                 status += ",Bypassed,";
             }
         }
+    } else if (response && context['r2-cache'] === "r2-null-server") {
+        console.log("R2 optimised race fetch from server");
     } else {
         // If the origin didn't send the control header we will send the cached response but update
         // the cached copy asynchronously (stale-while-revalidate). This commonly happens with
@@ -567,7 +581,6 @@ async function processRequest(originalRequest, context) {
                         console.log("Refresh Cache");
                         // In service workers, waitUntil() tells the browser that work is ongoing until
                         // the promise settles, and it shouldn't terminate the service worker if it wants that work to be complete.
-                        // ToDO: optimize this stuff for better server performance by reducing backend server requests
                         event.waitUntil(updateCache(originalRequest, cacheVer, event, cacheAlways));
                     } else {
                         status += ',Stale_' + age + ',';
@@ -587,7 +600,7 @@ async function processRequest(originalRequest, context) {
 
         if (['r2-null-server', 'server-first', 'miss'].includes(context['r2-cache'])) {
             // If Server was used insead of R2
-            response.headers.set('R2', context['r2-cache']);
+            response.headers.set('R2-cache', context['r2-cache']);
         }
         if (context.error !== "") {
             response.headers.set('CFW-Error', context.error);
@@ -600,6 +613,9 @@ async function processRequest(originalRequest, context) {
         }
         if (context['CDN-revalidate']) {
             response.headers.set('CDN-Revalidate', "1");
+        }
+        if (context.serverPromise !== null) {
+            response.headers.set('R2-promise', "1");
         }
 
         let getCacheTime = getCachedTimeEnd - getCachedTimeStart;
@@ -862,6 +878,8 @@ async function getCachedResponse(request, context) {
             let useStale = true;
 
             if (cachedResponse) {
+                console.log("Status: " + String(cachedResponse.status));
+                console.log(cachedResponse);
                 // Copy Response object so that we can edit headers.
                 cachedResponse = new Response(cachedResponse.body, cachedResponse);
 
@@ -872,6 +890,9 @@ async function getCachedResponse(request, context) {
                 if (R2StaleUsed) {
                     cachedResponse.headers.set('r2-stale', "true");
                     context['r2-stale'] = true;
+                }
+                if (context['r2-cache'] === "server-first") {
+                    cachedResponse.headers.set('r2', "server");
                 }
                 if (!R2StaleUsed && needsRevalidate) {
                     cachedResponse.headers.set('cdn-stale', "true");
@@ -1505,7 +1526,7 @@ function processConfig() {
     ALLOWED_GET_ONLY = getConfigValue("ENV_ALLOWED_GET_ONLY", ALLOWED_GET_ONLY);
 
     PWA_ENABLED = getConfigValue("ENV_PWA_ENABLED", PWA_ENABLED);
-    R2_SERVER_REQUEST = getConfigValue("ENV_R2_SERVER_REQUEST", R2_SERVER_REQUEST);
+    R2_SERVER_RACE = getConfigValue("ENV_R2_SERVER_RACE", R2_SERVER_RACE);
 
     CUSTOM_PRELOAD = getConfigValue("ENV_CUSTOM_PRELOAD", [
         "<https://fonts.gstatic.com>; rel=preconnect",
@@ -1522,7 +1543,6 @@ function processConfig() {
     // set config by single Json file ENV_JSON_CONFIG {json} varriable 
     // single ENV varrable has priority 
     getENVConfigJson();
-
 }
 
 /**
@@ -1640,5 +1660,31 @@ async function checkBodySize(clonedResponse, limitInKBytes = BODY_MIN_SIZE) {
     }
     if (size < limitInKBytes) {
         return false;
+    }
+}
+
+
+/**
+ * Parse Boolean
+ * 
+ * @param {string} str 
+ * @returns {boolean}
+ */
+function parseBoolean(str) {
+    if (typeof str !== 'string') {
+        return false; // Default to false if it's not a string
+    }
+    switch (str.toLowerCase().trim()) {
+        case 'true':
+        case '1':
+        case 'yes':
+            return true;
+        case 'false':
+        case '0':
+        case 'no':
+        case '':
+            return false;
+        default:
+            return false; // Or throw an error for unexpected input
     }
 }
