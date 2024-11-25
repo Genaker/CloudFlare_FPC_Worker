@@ -38,6 +38,15 @@ Now, you can set *HTML_CACHE_VERSION* via the Cloud Flare dashboard by adding th
 You can override many variables by setting the from the dashboard by adding **ENV_** prefix to the var name:
 ![image](https://github.com/user-attachments/assets/6fdc73d8-fe6e-41ad-ba7e-abc88aa1e12d)
 
+# Worker GET parameters:
+
+- **&cfw=false** - disable Cloud worker, bypass all worker logic 
+- **&cf-cdn=false** - bypass Cloud Flare EDGE CDN cache, but R2 cache still works
+- **&r2-cdn=false** - bypass R2 cache
+- **&cf-revalidate=true** - revalidate URL in the cache
+- **&cf-delete=true** - delete from the edge cache but not from R2
+- **&cf-purge** - purge entire cache by changing cache version. called ONCE(1) - soft purge. TWICE(2) - hard purge. 
+
 # Speculative Rules
 Speculation is added to the worker response.
 
