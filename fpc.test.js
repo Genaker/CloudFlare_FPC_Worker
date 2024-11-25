@@ -415,10 +415,10 @@ describe("Test R2 Stale", () => {
     expect(headers.get('Cache-Version')).toEqual((previousCacheVersion + 1).toString());
   });
 
-  test('Fetch Changed Version without CDN', async () => {
+  test('Fetch Changed Version without CDN - R2 Stale', async () => {
     const cdnMissParameter = "&cf-cdn=false"
     const url = URL + uniqueParam;
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 4000));
     const response = await fetch(url + cdnMissParameter);
     const headers = response.headers;
     console.log(url);
