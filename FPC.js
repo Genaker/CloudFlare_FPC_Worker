@@ -256,7 +256,7 @@ addEventListener("fetch", async event => {
         'CDN-revalidate': false,
         'set-version': "",
         'speculation': false,
-        url: "",
+        url: null,
         cookies: "",
         bypassCookies: false,
         bypassCache: false,
@@ -492,6 +492,10 @@ async function processRequest(originalRequest, context) {
         // if we still have promise from R2... 
         if (context.serverPromise !== null) {
             response = await context.serverPromise;
+            if (context['r2-server-first']) {
+                // if server respond first considering it is from cache 
+                cfCacheStatus = "HIT";
+            }
         }
         if (!response) {
             // Fetch it from origin
