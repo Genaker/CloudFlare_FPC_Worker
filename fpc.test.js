@@ -548,22 +548,22 @@ describe("Test HASH", () => {
 
   test("Read hash", async () => {
     await new Promise((r) => setTimeout(r, 4000));
-    response = await fetch(URL + GET + "&cf-cdn=false");
+    response = await fetch(URL + GET + "&cf-cdn=false&r2-race=false");
     headers = response.headers;
     console.log(URL + GET);
     console.log(response);
     console.log(headers);
     expect(response.status).toEqual(200);
+    let status = "FromR2,SavedCDNasync,Hit";
+    expect(headers.get('x-html-edge-cache-status')).toContain(status);
     hash = headers.get('r2-hash');
     r2Time = headers.get('r2-time');
     expect(headers.get('r2-hash')).not.toBeNull();
     expect(headers.get('cf-cache-status')).toEqual(HIT);
-    let status = "FromR2,SavedCDNasync,Hit";
-    expect(headers.get('x-html-edge-cache-status')).toContain(status);
-  });
+    });
 
   test("Fetch with expired AGE and check new hash", async () => {
-    GET = GET + "&cf-ttl=1&cf-cdn=false";
+    GET = GET + "&cf-ttl=1&cf-cdn=false&r2-race=false";
     //Wait 12 Seconds
     await new Promise((r) => setTimeout(r, 5000));
     response = await fetch(URL + GET);
@@ -572,19 +572,21 @@ describe("Test HASH", () => {
     console.log(response);
     console.log(headers);
     expect(response.status).toEqual(200);
+    // If from server it doesn't have hash
+    
     expect(headers.get('r2-hash')).not.toBeNull();
     expect(headers.get('r2-hash')).toEqual(hash);
     expect(headers.get('r2-time')).toEqual(r2Time);
+    
     expect(headers.get('cf-cache-status')).toEqual(HIT);
-    let status = "Hit,Refreshed";
-    expect(headers.get('x-html-edge-cache-status')).toContain(status);
+    expect(headers.get('x-html-edge-cache-status')).toContain('Hit');
+    expect(headers.get('x-html-edge-cache-status')).toContain('Refreshed');
     expect(headers.get('custom-ttl')).toContain("1");
   });
 })
 
-
 describe("301 redirect test", () => {
-  GET2 = "/about-tilebar/?dfsd=" + Date.now();
+  GET2 = "/about-tilebar/?r2-race=false&dfsd=" + Date.now();
   test('Pre Fetch  301', async () => {
     //warm up cache
     let response = await fetch(URL + GET2, { redirect: "manual" });
