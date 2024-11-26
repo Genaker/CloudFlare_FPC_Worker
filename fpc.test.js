@@ -560,7 +560,7 @@ describe("Test HASH", () => {
     r2Time = headers.get('r2-time');
     expect(headers.get('r2-hash')).not.toBeNull();
     expect(headers.get('cf-cache-status')).toEqual(HIT);
-    });
+  });
 
   test("Fetch with expired AGE and check new hash", async () => {
     GET = GET + "&cf-ttl=1&cf-cdn=false&r2-race=false";
@@ -573,11 +573,11 @@ describe("Test HASH", () => {
     console.log(headers);
     expect(response.status).toEqual(200);
     // If from server it doesn't have hash
-    
+
     expect(headers.get('r2-hash')).not.toBeNull();
     expect(headers.get('r2-hash')).toEqual(hash);
     expect(headers.get('r2-time')).toEqual(r2Time);
-    
+
     expect(headers.get('cf-cache-status')).toEqual(HIT);
     expect(headers.get('x-html-edge-cache-status')).toContain('Hit');
     expect(headers.get('x-html-edge-cache-status')).toContain('Refreshed');
