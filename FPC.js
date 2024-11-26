@@ -430,7 +430,7 @@ async function processRequest(originalRequest, context) {
     //ToDo: exclude some mime types
     isHTML = true;
     let getCachedTimeStart = Date.now();
-    let { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways } = await getCachedResponse(originalRequest, context);
+    let { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways } = await getCachedResponse(originalRequest.clone(), context);
     let getCachedTimeEnd = Date.now();
 
     // if revalidate request
@@ -478,7 +478,7 @@ async function processRequest(originalRequest, context) {
 
         console.log("Not From Cache");
         // Clone the request, add the edge-cache header and send it through.
-        let request = new Request(originalRequest, {
+        let request = new Request(originalRequest.clone(), {
             headers: {
                 ...Object.fromEntries(originalRequest.headers.entries()),
                 "Accept-Encoding": "br, gzip", // Request both Brotli and Gzip support
@@ -492,7 +492,7 @@ async function processRequest(originalRequest, context) {
         // if we still have promise from R2... 
         if (context.serverPromise !== null) {
             response = await context.serverPromise;
-            if (context['r2-server-first']) {
+            if(context['r2-server-first']){
                 // if server respond first considering it is from cache 
                 cfCacheStatus = "HIT";
             }
@@ -978,7 +978,7 @@ async function purgeCache(cacheVer, event) {
 */
 async function updateCache(originalRequest, cacheVer, event, cacheAlways) {
     // Clone the request, add the edge-cache header and send it through.
-    let request = new Request(originalRequest);
+    let request = new Request(originalRequest.clone());
     let status = "";
     request.headers.set('x-HTML-Edge-Cache', 'supports=cache|purgeall|bypass-cookies');
     let response = await fetch(request);
