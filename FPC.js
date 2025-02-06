@@ -192,7 +192,9 @@ var BYPASS_URL = [
     'account',
     'feedonomics',
     'estimateddeliverydate',
-    'original-page'
+    'original-page',
+    'connector/email',
+    'wp-content/uploads'
 ];
 
 // URL will always be cached no matter what
@@ -523,6 +525,10 @@ async function processRequest(originalRequest, context) {
             let newBody = await processManifesto(response, context);
             response = new Response(newBody, response);
         }
+        if (SPECULATION_ENABLED) {
+            let newBody = await processSpeculation(response, context);
+            response = new Response(newBody, response);
+        }
         //ToDo: Seams redundant refactor
         if (response) {
             console.log("Origin CF Cache Status: " + response.headers.get('cf-cache-status'));
@@ -669,7 +675,8 @@ async function processRequest(originalRequest, context) {
             })
         }
         if (SPECULATION_ENABLED && !bypassCache) {
-            response.headers.set("Speculation-Rules", "\"/rules/speculation.json?v=" + PWA_SPECULATION_VERSION + "\"");
+            // No Headers Anymore
+           // response.headers.set("Speculation-Rules", "\"/rules/speculation.json?v=" + PWA_SPECULATION_VERSION + "\"");
         }
     }
     console.log("Return Response");
@@ -1366,6 +1373,23 @@ async function processManifesto(response, context) {
     const title = "</title>";
     let responseText = await response.text();
     responseText = responseText.replace(title, "</title><link rel=\"manifest\" href=\"/cf/manifesto.json?v=" + PWA_SPECULATION_VERSION + "\" />");
+
+    //console.log(responseText);
+    return responseText;
+}
+
+/**
+ * Add speculationo to the responso 
+ * 
+ * @param {Response} response - responese to add speculation to
+ * @param {object} context 
+ * @returns {Promise<string>}
+ */
+async function processSpeculation(response, context) {
+    // ESI tags is space and case sensitive 
+    const title = "</title>";
+    let responseText = await response.text();
+    responseText = responseText.replace(title, "</title><script type=\"speculationrules\">" + JSON.stringify(CUSTOM_SPECULATION) + "</script>");
 
     //console.log(responseText);
     return responseText;
