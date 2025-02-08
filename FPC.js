@@ -671,7 +671,7 @@ async function processRequest(originalRequest, context) {
         }
         if (CUSTOM_PRELOAD.length != 0) {
             CUSTOM_PRELOAD.forEach((preload) => {
-                response.headers.set("Link", preload);
+                response.headers.append("Link", preload);
             })
         }
         if (SPECULATION_ENABLED && !bypassCache) {
