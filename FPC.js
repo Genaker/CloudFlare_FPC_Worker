@@ -353,9 +353,14 @@ addEventListener("fetch", async event => {
     }
 
     // Hostname for a different zone
-    if (typeof OTHER_HOST !== 'undefined') {
-        console.log("Other Host: " + OTHER_HOST);
-        cacheUrl.hostname = OTHER_HOST;
+    if (typeof OTHER_HOST !== 'undefined' && OTHER_HOST) {
+        // Basic validation: ensure it looks like a valid hostname
+        if (OTHER_HOST.match(/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i)) {
+            console.log("Other Host: " + OTHER_HOST);
+            cacheUrl.hostname = OTHER_HOST;
+        } else {
+            console.log("Invalid OTHER_HOST format, ignoring: " + OTHER_HOST);
+        }
     }
 
     // Remove marketing GET parameters from the URL
@@ -701,11 +706,10 @@ function shouldBypassEdgeCache(request, response = null) {
     let bypassCache = false;
 
     if (request /*&& response*/) {
-        const options = false; // = getResponseOptions(response);
         const cookieHeader = request.headers.get('cookie');
         let bypassCookies = DEFAULT_BYPASS_COOKIES;
 
-        //CAHE_LOGGEDIN_USERS
+        //CACHE_LOGGED_IN_USERS
         bypassCache = checkCookies(cookieHeader, bypassCookies);
     }
 
