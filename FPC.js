@@ -1349,14 +1349,21 @@ async function processESI(response, context) {
     });
     let results = await Promise.all(subRequest);
 
-    results.forEach(async (result, ind) => {
+    // Process results sequentially to properly handle async text() calls
+    for (let ind = 0; ind < results.length; ind++) {
+        const result = results[ind];
         console.log(esiTags[ind].source);
-        if (result.status === 200) {
-            responseText = responseText.replace(esiTags[ind].source, await result.text());
-        } else {
-            responseText = responseText.replace(esiTags[ind].source, "<!--ESI not 200-->");
+        try {
+            if (result.status === 200) {
+                responseText = responseText.replace(esiTags[ind].source, await result.text());
+            } else {
+                responseText = responseText.replace(esiTags[ind].source, "<!--ESI not 200-->");
+            }
+        } catch (error) {
+            console.log("ESI processing error:", error);
+            responseText = responseText.replace(esiTags[ind].source, "<!--ESI error-->");
         }
-    });
+    }
     //console.log(responseText);
     return responseText;
 }
