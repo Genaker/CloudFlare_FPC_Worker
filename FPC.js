@@ -1485,7 +1485,9 @@ function processConfig() {
         }
         // Check if 6 minutes (360000 ms) have passed since last sync
         if ((Date.now() - KV_CONFIG_LAST_SYNC) > 360000) {
+            // Reset timestamp first to mark the start of next interval
             KV_CONFIG_LAST_SYNC = Date.now();
+            // Note: waitUntil runs async, so we set timestamp before sync
             //event.waitUntil(syncKvConfig());
         }
     }
