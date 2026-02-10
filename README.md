@@ -4,6 +4,22 @@ The original idea was the Shopify FPC cache from the CloudFlare CDN, AWS Cloud F
 
 ![image](https://github.com/user-attachments/assets/1dcb535e-3d0d-4e0a-b399-9f331807420d)
 
+# 🎉 Version 2.0 - Improved Architecture
+
+**NEW**: The worker has been refactored with a modular architecture for better maintainability and extensibility!
+
+- ✅ **Modular Design**: Organized into focused, reusable components
+- ✅ **Better Testing**: Each module can be tested independently
+- ✅ **Improved Documentation**: Comprehensive API documentation
+- ✅ **Backward Compatible**: Original `FPC.js` still works as before
+- ✅ **TypeScript Ready**: Structure prepared for TypeScript conversion
+
+**Quick Links**:
+- 📖 [Architecture Documentation](ARCHITECTURE.md) - Learn about the new modular structure
+- 🔄 [Migration Guide](MIGRATION.md) - How to adopt the new architecture
+- 💡 [Examples](EXAMPLES.md) - Practical usage examples
+- 🚀 [Installation](#installation) - Get started quickly
+
 # How it works
 The Edge Worker Magento full-page cache feature helps you optimize eCommerce performance by caching your Magento backend server's generated HTML or API response. 
 
