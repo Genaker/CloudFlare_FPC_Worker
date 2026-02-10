@@ -11,7 +11,7 @@ module.exports = {
   collectCoverageFrom: [
     'FPC.js',
     '!**/node_modules/**',
-    '!**/generate.js/**'
+    '!generate.js'
   ],
   
   // Coverage thresholds (optional - uncomment to enforce)

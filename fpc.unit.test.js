@@ -3,6 +3,14 @@
  * 
  * These tests validate individual helper functions without requiring
  * a live CloudFlare environment or network requests.
+ * 
+ * NOTE: Functions are duplicated from FPC.js for testing purposes because
+ * CloudFlare Worker scripts cannot be directly imported in Node.js.
+ * 
+ * MAINTENANCE: When updating FPC.js helper functions, remember to:
+ * 1. Update the corresponding function in this test file
+ * 2. Update or add tests to cover the changes
+ * 3. Run npm run test:unit to verify all tests pass
  */
 
 // Import necessary functions from FPC.js
