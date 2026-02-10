@@ -12,14 +12,8 @@ var KV_CONFIG_CHECK = [];
 var KV_CONFIG = [];
 var JSON_CONFIG = {};
 
-var IP_count = [];
-
 //KV Config doesn't make sens. ENV var change automatically deploys new Worker version 
 var KV_CONFIG_ENABLED = false;
-
-//limited to 128 MB
-var WORKER_CACHE_STORAGE = [];
-var WORKER_CACHE_STAT = [];
 
 // API settings if KV isn't being used
 var CLOUDFLARE_API = {
@@ -43,11 +37,6 @@ var VERSION_COOKIES = [
 var DEFAULT_BYPASS_COOKIES = [
     'admin'
     //"X-Magento-Vary"
-];
-
-var R2_CAHE_LOGGEDIN_USERS = false;
-const USER_COOKIES = [
-    'X-Magento-Vary'
 ];
 
 const FORM_KEY = 'form_key';

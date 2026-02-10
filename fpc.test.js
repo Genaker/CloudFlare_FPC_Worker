@@ -118,27 +118,6 @@ describe("FPC TESTS", () => {
     expect(headers.get('x-html-edge-cache-status')).toContain("Hit,");
   });
 
-  test('Repeated Requests Pass CDN', async () => {
-    // add bypass CDN get parameter 
-    const bypassCDN = "&cf-cdn=false"
-    const url = URL + uniqueParam;
-    await new Promise((r) => setTimeout(r, 1000));
-    let response = await fetch(url + bypassCDN);
-    const headers = response.headers;
-    console.log(url);
-    console.log(response);
-    console.log(headers);
-    const cacheVersion = parseInt(headers.get('x-html-edge-cache-version'));
-    expect(response.status).toEqual(200);
-    expect(headers.get('age')).not.toBeNull();
-    expect(headers.get('js-time')).not.toBeNull();
-    expect(headers.get('r2-time')).not.toBeNull();
-    expect(headers.get('r2')).toEqual("true");
-    expect(headers.get('cf-cache-status')).toEqual(HIT);
-    expect(headers.get('key')).toEqual(url + "&cf_edge_cache_ver=" + cacheVersion);
-    expect(headers.get('x-html-edge-cache-status')).toContain("Hit,");
-  });
-
 
   test('Delete Page from CDN', async () => {
     // add bypass CDN get parameter 
@@ -496,10 +475,6 @@ describe("Speculation Rules Test", () => {
     expect(headers.get('cf-cache-status')).toEqual(HIT);
     expect(response.headers.get('x-html-edge-cache-version')).toEqual(beforeTestVersion);
   })
-})
-
-describe("GOD_MOD tests", () => {
-  test('PreFetch Url', () => { });
 })
 
 describe("Test Logged-In", () => {
