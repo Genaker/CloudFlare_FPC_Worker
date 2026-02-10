@@ -3,17 +3,17 @@
  * Main request processing orchestration
  */
 
-import { URLHandler } from '../utils/URLHandler.js';
-import { CookieHandler } from '../utils/CookieHandler.js';
-import { CacheManager } from '../cache/CacheManager.js';
-import { ResponseProcessor } from '../processors/ResponseProcessor.js';
-import { createLogger } from '../utils/Logger.js';
+import { URLHandler } from './utils/URLHandler.js';
+import { CookieHandler } from './utils/CookieHandler.js';
+import { CacheManager } from './cache/CacheManager.js';
+import { ResponseProcessor } from './processors/ResponseProcessor.js';
+import { createLogger } from './utils/Logger.js';
 import {
     DEFAULT_BYPASS_COOKIES,
     BYPASS_URL,
     CACHE_ALWAYS,
     CACHE_STATUSES
-} from '../config/constants.js';
+} from './config/constants.js';
 
 /**
  * RequestHandler class for processing requests

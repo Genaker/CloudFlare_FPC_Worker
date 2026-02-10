@@ -8,7 +8,8 @@
     "generate": "node generate.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "lint": "eslint src/**/*.js worker.js"
+    "lint": "eslint src/**/*.js worker.js",
+    "validate": "node validate-structure.js"
   },
   "repository": {
     "type": "git",
