@@ -212,8 +212,8 @@ export class ResponseProcessor {
     /**
      * Check body size
      * @param {Response} response - Response to check
-     * @param {number} limitInKBytes - Size limit in KB
-     * @returns {Promise<boolean>} True if within limit
+     * @param {number} limitInKBytes - Minimum size limit in KB
+     * @returns {Promise<boolean>} True if body size meets minimum
      */
     async checkBodySize(response, limitInKBytes) {
         try {

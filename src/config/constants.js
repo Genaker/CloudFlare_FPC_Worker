@@ -13,7 +13,7 @@ export const CACHE_CONTROL_NO_CACHE = [
 export const CACHE_STATUSES = [
     200,
     301,
-    //302, Bots creates a lot of redirects of this type. 
+    //302, Bots create a lot of redirects of this type. 
     //404
 ];
 
