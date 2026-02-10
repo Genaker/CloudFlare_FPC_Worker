@@ -353,9 +353,11 @@ addEventListener("fetch", async event => {
     }
 
     // Hostname for a different zone
+    // Note: This validation allows hostnames with optional port numbers (e.g., example.com:8080)
     if (typeof OTHER_HOST !== 'undefined' && OTHER_HOST) {
-        // Basic validation: ensure it looks like a valid hostname
-        if (OTHER_HOST.match(/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i)) {
+        // Basic validation: ensure it looks like a valid hostname (with optional port)
+        // Matches: example.com, sub.example.com, example.com:8080
+        if (OTHER_HOST.match(/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*(:[0-9]{1,5})?$/i)) {
             console.log("Other Host: " + OTHER_HOST);
             cacheUrl.hostname = OTHER_HOST;
         } else {
@@ -1353,21 +1355,28 @@ async function processESI(response, context) {
     });
     let results = await Promise.all(subRequest);
 
-    // Process results sequentially to properly handle async text() calls
-    for (let ind = 0; ind < results.length; ind++) {
-        const result = results[ind];
+    // Process text() calls in parallel for better performance
+    const textPromises = results.map(async (result, ind) => {
         console.log(esiTags[ind].source);
         try {
             if (result.status === 200) {
-                responseText = responseText.replace(esiTags[ind].source, await result.text());
+                return await result.text();
             } else {
-                responseText = responseText.replace(esiTags[ind].source, "<!--ESI not 200-->");
+                return "<!--ESI not 200-->";
             }
         } catch (error) {
             console.log("ESI processing error:", error);
-            responseText = responseText.replace(esiTags[ind].source, "<!--ESI error-->");
+            return "<!--ESI error-->";
         }
-    }
+    });
+    
+    const texts = await Promise.all(textPromises);
+    
+    // Replace all ESI tags with their fetched content
+    texts.forEach((text, ind) => {
+        responseText = responseText.replace(esiTags[ind].source, text);
+    });
+    
     //console.log(responseText);
     return responseText;
 }
@@ -1475,9 +1484,9 @@ function processConfig() {
             KV_CONFIG_LAST_SYNC = Date.now();
         }
         // Check if 6 minutes (360000 ms) have passed since last sync
-        if ((Date.now() - KV_CONFIG_LAST_SYNC) >= 360000) {
-            //event.waitUntil(syncKvConfig());
+        if ((Date.now() - KV_CONFIG_LAST_SYNC) > 360000) {
             KV_CONFIG_LAST_SYNC = Date.now();
+            //event.waitUntil(syncKvConfig());
         }
     }
 

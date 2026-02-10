@@ -162,7 +162,7 @@ Also, Enable CF Cache Reserve to increase edge cache HIT rate. To reduce CF cost
 
 ![image](https://github.com/user-attachments/assets/0c1bc4df-483e-45c8-b3a2-44cfe6dab817)
 
-Disable Cloud Flare Chache for Static and Media save and serve from the **Cache Reserve** <br/>
+Disable Cloud Flare Cache for Static and Media save and serve from the **Cache Reserve** <br/>
 Caching -> Cache Rules
 ![image](https://github.com/user-attachments/assets/bb3cca02-d45e-4f2b-bf5a-18bfee851c46)
 
