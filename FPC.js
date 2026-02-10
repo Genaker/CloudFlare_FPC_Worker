@@ -14,7 +14,7 @@ var JSON_CONFIG = {};
 
 var IP_count = [];
 
-//KV Config doesn't make sens. ENV var change automatically deploys new Worker version 
+//KV Config doesn't make sense. ENV var change automatically deploys new Worker version 
 var KV_CONFIG_ENABLED = false;
 
 //limited to 128 MB
@@ -45,7 +45,7 @@ var DEFAULT_BYPASS_COOKIES = [
     //"X-Magento-Vary"
 ];
 
-var R2_CAHE_LOGGEDIN_USERS = false;
+var R2_CACHE_LOGGEDIN_USERS = false;
 const USER_COOKIES = [
     'X-Magento-Vary'
 ];
@@ -220,7 +220,7 @@ var GOD_MOD;
 // User will receive old/stale version
 var REVALIDATE_AGE;
 var R2_STALE = true;
-// Send R2 and Server response semultaniosly and use which one will be recieved first
+// Send R2 and Server response simultaneously and use which one will be received first
 var R2_SERVER_RACE = true;
 var TEST;
 
@@ -705,7 +705,7 @@ function shouldBypassEdgeCache(request, response = null) {
         const cookieHeader = request.headers.get('cookie');
         let bypassCookies = DEFAULT_BYPASS_COOKIES;
 
-        //CAHE_LOGGEDIN_USERS
+        //CACHE_LOGGEDIN_USERS
         bypassCache = checkCookies(cookieHeader, bypassCookies);
     }
 
