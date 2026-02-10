@@ -29,7 +29,7 @@ CF Edge Worker Magent Full-page cache intercepts incoming requests and checks if
  - If a cached version is found and it is stale, then the cached content is served to the user. The CF worker is executed in the background and requests a new version of the page caches from the Magento backend server for future requests. CF FPC is revalidated from the server asynchronously after 5 minutes or so, but you can change the time and logic.
  - If a cached version isn't found, the CF FPC worker sends a request to the Magento server to be used for future requests.
 
-CF Worker “softpurge” the cache by changing cache Version stored in the KV(Key Value)storage. Cloud flare serve the stale content untill it will not be updayed asynchronously (in the background) fetches the new page. Cloud Front ignores any cache rules from Magento and has own logic which serve web pages from the CDN cache even if Magento 2 website is broken. 
+CF Worker “softpurge” the cache by changing cache Version stored in the KV(Key Value)storage. Cloud flare serve the stale content until it will not be updated asynchronously (in the background) fetches the new page. Cloud Front ignores any cache rules from Magento and has own logic which serve web pages from the CDN cache even if Magento 2 website is broken. 
 <br/>
 Now, you can set *HTML_CACHE_VERSION* via the Cloud Flare dashboard by adding the variable **ENV_HTML_CACHE_VERSION**. It will override the default cache version logic and can't be purged except to set a new version from the dashboard.
 <img width="401" alt="image" src="https://github.com/user-attachments/assets/0da62145-fe10-4b05-9fb6-23c12780567d">
@@ -65,7 +65,7 @@ For CF FPC Worker to consider a response from a Magento backend as cacheable, th
 # Aditional features
 - URL Query String Filtering and sorting 
 - Traffic filtering and control
-- Cache logic adjustment. You don't need any VCL now you can do everething in pure JavaScript
+- Cache logic adjustment. You don't need any VCL now you can do everything in pure JavaScript
 - Content manipulation
 - Speculation rules prerender and prefetch
 - Link header resource preload
