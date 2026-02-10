@@ -45,7 +45,7 @@ var DEFAULT_BYPASS_COOKIES = [
     //"X-Magento-Vary"
 ];
 
-var R2_CAHE_LOGGEDIN_USERS = false;
+var R2_CACHE_LOGGED_IN_USERS = false;
 const USER_COOKIES = [
     'X-Magento-Vary'
 ];
@@ -220,7 +220,7 @@ var GOD_MOD;
 // User will receive old/stale version
 var REVALIDATE_AGE;
 var R2_STALE = true;
-// Send R2 and Server response semultaniosly and use which one will be recieved first
+// Send R2 and Server response simultaneously and use which one will be received first
 var R2_SERVER_RACE = true;
 var TEST;
 
@@ -343,7 +343,7 @@ addEventListener("fetch", async event => {
         cacheUrl.searchParams.delete('cf-revalidate');
     }
     if (cacheUrl.searchParams.get('cf-ttl')) {
-        context["CDN-ttl"] = parseInt(cacheUrl.searchParams.get('cf-ttl'));;
+        context["CDN-ttl"] = parseInt(cacheUrl.searchParams.get('cf-ttl'), 10);
         cacheUrl.searchParams.delete('cf-ttl');
     }
     if (cacheUrl.searchParams.get('r2-race')) {
@@ -529,7 +529,7 @@ async function processRequest(originalRequest, context) {
             let newBody = await processSpeculation(response, context);
             response = new Response(newBody, response);
         }
-        //ToDo: Seams redundant refactor
+        //TODO: Seems redundant, refactor
         if (response) {
             console.log("Origin CF Cache Status: " + response.headers.get('cf-cache-status'));
             if (response.headers.get('cf-cache-status') === "HIT") {
@@ -584,7 +584,7 @@ async function processRequest(originalRequest, context) {
             if (needsRevalidate || !bypassCache) {
                 const options = getResponseOptions(response);
                 if (needsRevalidate || !options) {
-                    let age = parseInt(response.headers.get('age'));
+                    let age = parseInt(response.headers.get('age') || '0', 10);
                     // If the cache is new, don't send the backend request
                     if (needsRevalidate || age > context["CDN-ttl"] || age > REVALIDATE_AGE) {
                         status += ',Refreshed,';
@@ -609,7 +609,7 @@ async function processRequest(originalRequest, context) {
         response.headers.append('Server-Timing', 'fetch-origin;desc="Fetch From Origin";dur=' + (originTimeEnd - originTimeStart).toString());
 
         if (['r2-null-server', 'server-first', 'miss'].includes(context['r2-cache'])) {
-            // If Server was used insead of R2
+            // If Server was used instead of R2
             response.headers.set('R2-cache', context['r2-cache']);
         }
         if (context.error !== "") {
@@ -919,7 +919,7 @@ async function getCachedResponse(request, context) {
                 cachedResponse.headers.delete('Cache-Control');
 
                 if (cachedResponse.headers.get('R2-Status')) {
-                    cachedResponse.status = parseInt(cachedResponse.headers.get('R2-Status'));
+                    cachedResponse.status = parseInt(cachedResponse.headers.get('R2-Status'), 10);
                 }
                 if (!fromR2) {
                     cachedResponse.headers.delete('R2-Status');
@@ -1040,7 +1040,7 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
             let clonedResponse = originalResponse.clone();
             // check response length but requires Content-Length header
             if (clonedResponse && clonedResponse.status === 200) {
-                if (parseInt(clonedResponse.headers.get('Content-Length')) < BODY_MIN_SIZE) {
+                if (parseInt(clonedResponse.headers.get('Content-Length') || '0', 10) < BODY_MIN_SIZE) {
                     console.log("BYPASSBYSIZE: " + clonedResponse.headers.get('Content-Length'));
                     return status += "BYPASSBYSIZE";
                 }
@@ -1103,7 +1103,7 @@ function getResponseOptions(response) {
     let options = null;
     let header = response.headers.get('x-HTML-Edge-Cache');
     if (header) {
-        //DoDo: Refactor
+        //TODO: Refactor
         options = {
             purge: false,
             cache: false,
@@ -1173,7 +1173,7 @@ async function getCurrentCacheVersion(cacheVer) {
                 cacheVer = 0;
                 await KV.put('html_cache_version', cacheVer.toString());
             } else {
-                cacheVer = parseInt(cacheVer);
+                cacheVer = parseInt(cacheVer, 10);
             }
         } else {
             cacheVer = -1;
@@ -1362,9 +1362,9 @@ async function processESI(response, context) {
 }
 
 /**
- * Add manifesto to the responso 
+ * Add manifest to the response 
  * 
- * @param {Response} response - responese to add manifest to
+ * @param {Response} response - response to add manifest to
  * @param {object} context 
  * @returns {Promise<string>}
  */
@@ -1379,9 +1379,9 @@ async function processManifesto(response, context) {
 }
 
 /**
- * Add speculationo to the responso 
+ * Add speculation to the response 
  * 
- * @param {Response} response - responese to add speculation to
+ * @param {Response} response - response to add speculation to
  * @param {object} context 
  * @returns {Promise<string>}
  */
@@ -1429,7 +1429,7 @@ function getConfigValue(variableName, defaultValue = true, type = 'bool') {
                 break;
             case 'integer':
             case 'int':
-                value = parseInt(configValue);
+                value = parseInt(configValue, 10);
                 break
             case 'float':
                 value = parseFloat(configValue);
@@ -1463,7 +1463,8 @@ function processConfig() {
         if (KV_CONFIG_LAST_SYNC === null) {
             KV_CONFIG_LAST_SYNC = Date.now();
         }
-        if ((Date.now() - KV_CONFIG_LAST_SYNC) === 360) {
+        // Check if 6 minutes (360000 ms) have passed since last sync
+        if ((Date.now() - KV_CONFIG_LAST_SYNC) >= 360000) {
             //event.waitUntil(syncKvConfig());
             KV_CONFIG_LAST_SYNC = Date.now();
         }
@@ -1628,7 +1629,7 @@ async function fetchAndModifyHeaders(request, headers = []) {
 async function hash(string, context) {
     // Magento captcha issue fixed
     /*const time = new Date();
-    let intTime = parseInt(time.getTime() / 10000000000);
+    let intTime = parseInt(time.getTime() / 10000000000, 10);
     let re = new RegExp(intTime + '.{5,25}', "g");
     let form_key = getCookie(context.cookies, FORM_KEY);
   

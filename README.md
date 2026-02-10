@@ -162,7 +162,7 @@ Also, Enable CF Cache Reserve to increase edge cache HIT rate. To reduce CF cost
 
 ![image](https://github.com/user-attachments/assets/0c1bc4df-483e-45c8-b3a2-44cfe6dab817)
 
-Disable Cloud Flare Chache for Static and Media save and serve from the **Cache Reserve** <be \>
+Disable Cloud Flare Chache for Static and Media save and serve from the **Cache Reserve** <br/>
 Caching -> Cache Rules
 ![image](https://github.com/user-attachments/assets/bb3cca02-d45e-4f2b-bf5a-18bfee851c46)
 
@@ -172,9 +172,9 @@ Add Rule
 Expression : 
 
 ```
-(http.request.full_uri wildcard "*.site.com/static/*") or (http.request.full_uri wildcard "*.site.com/media/*"
+(http.request.full_uri wildcard "*.site.com/static/*") or (http.request.full_uri wildcard "*.site.com/media/*")
 ```
-Replace **site** with your <br\>
+Replace **site** with your domain<br/>
 
 Please update this documentation when you will do it yourself. It is just a fast-written manual. 
 For detailed information, check the Worker code. 
@@ -186,7 +186,7 @@ If you have any issues, create an issue or email me: egorshitikov[A]gmail.com
 We also developed a Magento Extension designed to enhance communication and performance between CF Workers and the cache system. <br\>
 While this extension is not yet publicly available, feel free to contact me directly if you’re interested in receiving it.
 
-# Cache Debug Cockies
+# Cache Debug Cookies
 You can add any cookies you want just by changing the script.
 
 # Default Cookies: 
