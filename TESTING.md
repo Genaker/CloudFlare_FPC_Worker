@@ -97,6 +97,12 @@ npm test
 ```
 **Note:** Integration tests will fail without TEST_URL environment variable set.
 
+### Run with Coverage
+```bash
+npm run test:coverage
+```
+**Note:** Coverage reports show 0% for FPC.js because the worker code cannot be directly imported in Node.js. The unit and mock tests duplicate the functions to test the logic. This is a known limitation of testing CloudFlare Workers outside their runtime environment.
+
 ## Test Statistics
 
 | Test Type | Test Count | Dependencies |
