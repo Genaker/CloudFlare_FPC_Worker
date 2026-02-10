@@ -1,12 +1,15 @@
 {
   "name": "cloudflare_fpc_worker",
-  "version": "1.0.0",
-  "description": "Magento 2 Cloud Flare FPC worker",
-  "main": "FPC.js",
+  "version": "2.0.0",
+  "description": "Magento 2 Cloud Flare FPC worker - Modular Architecture",
+  "main": "worker.js",
   "type": "module",
   "scripts": {
     "generate": "node generate.js",
-    "test": "jest"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.js worker.js",
+    "validate": "node validate-structure.js"
   },
   "repository": {
     "type": "git",
@@ -26,11 +29,23 @@
     "url": "https://github.com/Genaker/CloudFlare_FPC_Worker/issues"
   },
   "homepage": "https://github.com/Genaker/CloudFlare_FPC_Worker#readme",
+  "files": [
+    "worker.js",
+    "FPC.js",
+    "src/**/*",
+    "ARCHITECTURE.md",
+    "MIGRATION.md",
+    "EXAMPLES.md"
+  ],
   "devDependencies": {
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "eslint": "^8.0.0"
   },
   "dependencies": {
     "js-crawler": "^0.3.21",
     "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
