@@ -6,7 +6,11 @@
   "type": "module",
   "scripts": {
     "generate": "node generate.js",
-    "test": "jest"
+    "test": "jest",
+    "test:unit": "jest --testPathPattern='(unit|mock)'",
+    "test:integration": "jest fpc.test.js",
+    "test:all": "jest",
+    "test:coverage": "jest --coverage --testPathPattern='(unit|mock)'"
   },
   "repository": {
     "type": "git",

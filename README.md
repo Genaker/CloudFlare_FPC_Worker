@@ -7,14 +7,28 @@ The original idea was the Shopify FPC cache from the CloudFlare CDN, AWS Cloud F
 # How it works
 The Edge Worker Magento full-page cache feature helps you optimize eCommerce performance by caching your Magento backend server's generated HTML or API response. 
 
-# Integration Jest tests
-All functionality is covered with the Jest integration tests. You can test your website and you rule as well. 
-Running the test:
-```
-export TEST_URL="https://******.com/"
-npm install
+# Comprehensive Test Suite
+This project includes a comprehensive test suite with 179+ tests covering all worker functionality.
+
+## Test Types
+- **Unit Tests** (74 tests): Test individual helper functions without external dependencies
+- **Mock Tests** (65 tests): Test worker logic using mocked CloudFlare APIs
+- **Integration Tests** (~40 tests): End-to-end tests with live CloudFlare deployment
+
+## Running Tests
+```bash
+# Run unit and mock tests (no external dependencies required)
+npm run test:unit
+
+# Run integration tests (requires TEST_URL environment variable)
+export TEST_URL="https://your-site.com/"
+npm run test:integration
+
+# Run all tests
 npm test
 ```
+
+For detailed testing documentation, see [TESTING.md](TESTING.md).
 
 # Generate static HTML objects 
 Run next command
