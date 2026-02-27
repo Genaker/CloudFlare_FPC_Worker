@@ -4,6 +4,121 @@ The original idea was the Shopify FPC cache from the CloudFlare CDN, AWS Cloud F
 
 ![image](https://github.com/user-attachments/assets/1dcb535e-3d0d-4e0a-b399-9f331807420d)
 
+# Deployment
+
+You can deploy the worker in several ways:
+
+## Deploy via Cloudflare Dashboard (Quick Start)
+
+1. Create a Worker in Cloudflare Dashboard → Workers & Pages → Create Worker
+2. Edit Code → Insert Code from Git → Connect to `https://github.com/Genaker/CloudFlare_FPC_Worker`
+3. Configure KV binding and deploy
+4. Add a route for your domain (e.g. `*yoursite.com/*`)
+
+See the [Installation](#installation) section below for detailed steps.
+
+## Deploy via Wrangler CLI
+
+If you use Wrangler:
+
+```bash
+git clone https://github.com/Genaker/CloudFlare_FPC_Worker.git
+cd CloudFlare_FPC_Worker
+npm install
+cp wrangler.toml.example wrangler.toml   # if available
+# Edit wrangler.toml with your KV namespace and account ID
+npx wrangler deploy
+```
+
+## Deploy via CI/CD (GitHub Actions, etc.)
+
+You can add the worker to your CI pipeline. Example GitHub Actions step:
+
+```yaml
+- name: Deploy Cloudflare Worker
+  run: |
+    npm install -g wrangler
+    wrangler deploy
+  env:
+    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+```
+
+Store your secrets in the repository settings and ensure your `wrangler.toml` has the correct KV namespace binding.
+
+## Deploy via Terraform
+
+Use the [cloudflare Terraform provider](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs) to deploy the worker as infrastructure-as-code:
+
+```hcl
+terraform {
+  required_providers {
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
+    }
+  }
+}
+
+variable "cloudflare_account_id" {}
+variable "cloudflare_api_token" {}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
+resource "cloudflare_workers_kv_namespace" "fpc_kv" {
+  account_id = var.cloudflare_account_id
+  title      = "fpc-cache"
+}
+
+resource "cloudflare_worker_script" "fpc" {
+  account_id = var.cloudflare_account_id
+  name       = "magento-fpc"
+  content    = file("${path.module}/FPC.js")
+
+  kv_namespace_binding {
+    name         = "KV"
+    namespace_id = cloudflare_workers_kv_namespace.fpc_kv.id
+  }
+}
+
+resource "cloudflare_worker_route" "fpc_route" {
+  zone_id     = var.cloudflare_zone_id
+  pattern     = "*yoursite.com/*"
+  script_name = cloudflare_worker_script.fpc.name
+}
+```
+
+Run `terraform init`, `terraform plan`, then `terraform apply`. Ensure `FPC.js` and any required files are in the Terraform module path.
+
+## Deploy via Python (cloudflare Python SDK)
+
+Use the [cloudflare Python package](https://github.com/cloudflare/cloudflare-python) to deploy programmatically:
+
+```python
+from cloudflare import Cloudflare
+
+api = Cloudflare(api_token="YOUR_API_TOKEN")
+account_id = "YOUR_ACCOUNT_ID"
+
+# Read worker script
+with open("FPC.js", "r") as f:
+    script_content = f.read()
+
+# Create or update worker
+api.workers.scripts.upload(
+    account_id=account_id,
+    script_name="magento-fpc",
+    body={"script": script_content},
+)
+
+# Add KV binding (create namespace first via API or dashboard)
+# api.workers.scripts.settings.update(...)
+```
+
+Install: `pip install cloudflare`. For full deployment including KV bindings and routes, use the Workers API endpoints for [Workers Scripts](https://developers.cloudflare.com/api/operations/worker-scripts-upload-worker), [KV Namespaces](https://developers.cloudflare.com/api/operations/workers-kv-namespace-create-namespace), and [Worker Routes](https://developers.cloudflare.com/api/operations/worker-routes-create-route).
+
 # How it works
 The Edge Worker Magento full-page cache feature helps you optimize eCommerce performance by caching your Magento backend server's generated HTML or API response. 
 
@@ -14,6 +129,26 @@ Running the test:
 export TEST_URL="https://******.com/"
 npm install
 npm test
+```
+
+## Run integration tests with Docker
+
+```bash
+TEST_URL=https://yoursite.com/ docker compose run --rm fpc-tests
+```
+
+## Unit tests (Vitest + Miniflare)
+
+Unit tests run locally without a live site. They use Miniflare to emulate the Cloudflare Workers runtime.
+
+```bash
+npm run test:unit
+```
+
+Or with Docker:
+
+```bash
+docker compose run --rm fpc-unit
 ```
 
 # Generate static HTML objects 
@@ -50,7 +185,7 @@ You can override many variables by setting the from the dashboard by adding **EN
 # Speculative Rules
 Speculation is added to the worker response.
 
-To Debug speculative rules, go to Dev Tol Bar -> Application -> Speculative Load -> Speculation:
+To Debug speculative rules, go to **DevTools** → Application → Speculative Load → Speculation:
 ![image](https://github.com/user-attachments/assets/9a14a6fe-9f5b-490d-a78e-a85d8d1eae40)
 
 
@@ -74,12 +209,19 @@ For CF FPC Worker to consider a response from a Magento backend as cacheable, th
 - GOD MOD - cache can't be invalidated. It can be but not easy.
 - PWA installable APP 
 
+# R2 and Cache Reserve
+
+When R2 is configured (Ultra version), the worker can store and serve cached content from Cloudflare R2. This provides a persistent cache layer beyond the edge. The worker races R2 and the origin — whichever responds first is served. When the origin wins, the response is marked as `server-first` or `r2-null-server` in the `R2-cache` header. Both outcomes are valid; the cache is updated asynchronously.
+
+Cache Reserve uses R2 under the hood and integrates with the worker for higher hit rates. Enable Cache Reserve in the Cloudflare dashboard to improve cache persistence.
+
 # Worker and CF cache limitations:
  - The full-page cache is designed to work with the default magento cache, which is PHP Built-in FPC, FAST FPC (See repo: https://github.com/Genaker/FastFPC), or Varnish. You can try to use it as a main cache (see Cache Reserve), but it is not what it was designed for. ***The main idea of the CF Worker FPC Cache is Magento 2 pages are always served from the CF cache with async revalidation.**
  - You can't clear the cache by page. You can clear the entire cache only. That is why you need a default magento cache. However, it is designed to work without any cache clears. The worker will update it asynchronously. You mark the entire cache stale by changing its version. To hard clear the cache, you need to change the version twice. CF Worker checks the previous cache version to see if it is a stale cache.
 
 ## Installation
-Open Cloud Flare and Go to Workers
+
+**Navigation:** Cloudflare Dashboard → **Workers & Pages** (or go to [dash.cloudflare.com](https://dash.cloudflare.com) and select Workers & Pages from the sidebar).
 
 ![image](https://github.com/user-attachments/assets/9366da1d-8c40-4d38-9834-7f16f9805c3b)
 
@@ -102,13 +244,13 @@ Key-value storage features 4
 # Create KV (KeyValue) Storage to keep the cache version and some global settings 
 
 ![image](https://github.com/user-attachments/assets/243248a6-1a90-4a66-a569-3561f94e3df7)
-Workers & Pages -> KV -> Create a namespace 
+**Path:** Workers & Pages → **KV** → Create a namespace. (Alternatively: create the Worker first, then add a KV binding under Settings → Bindings; you can create a new namespace from there.) 
 ![image](https://github.com/user-attachments/assets/c1ec9f72-e60f-4a38-9f14-38439f3b8528)
 
 
 # Create Worker 
 
-Workers & Pages -> Overview -> Create -> Create Worker -> Deploy
+**Path:** Workers & Pages → **Create** (or **Create application**) → Create Worker. If using Git: choose **Clone and bootstrap a public repository** and enter `https://github.com/Genaker/CloudFlare_FPC_Worker`, then Deploy.
 
 ![image](https://github.com/user-attachments/assets/1f9b47eb-e5b7-473b-9d0f-f226f836cf97)
 
@@ -116,12 +258,13 @@ Workers & Pages -> Overview -> Create -> Create Worker -> Deploy
 
 # Insert CF Worker FPC Code from The repo 
 ![image](https://github.com/user-attachments/assets/bc2f608f-5df0-46cf-98c6-641bf785bca7)
-Edit Code -> Insert Code From the Git 
+**Path:** Edit Code → **Insert Code from Git** (or Connect to Git). Connect to `https://github.com/Genaker/CloudFlare_FPC_Worker`. If you created the worker from the Git repo in the previous step, skip this. 
 
 ![image](https://github.com/user-attachments/assets/5a39b35a-3b21-4f53-963d-7678b47b40f4)
 
 
 # Configure Worker
+**Path:** Your Worker → **Settings** → **Variables and Secrets** (for ENV vars) and **Settings** → **Bindings** (for KV).
 ![image](https://github.com/user-attachments/assets/3ba61a60-1f19-488a-903e-88416054911e)
 
 ![image](https://github.com/user-attachments/assets/ccb4ba67-bc60-492e-a6d7-99ac6cdf983b)
@@ -136,12 +279,13 @@ Worker *Variable name* must be **KV**. KV name doesn't matter (Select from the d
 NOTE: OTHER_HOST is not required settings 
 
 ![image](https://github.com/user-attachments/assets/8500a84b-931d-448f-9a7c-578e109399a4)
-Configure the **OTHER_HOST** (for example, google.com) variable to test workers through the worker domain. This will replace the worker domain with your staging or prod domain, and the server response will be fetched from there. This variable is not required. 
+Configure the **OTHER_HOST** variable with your actual domain (e.g. `www.yoursite.com`) to test the worker through the worker domain. This replaces the worker domain with your staging or prod domain so responses are fetched from your Magento server. This variable is not required for production. 
 
 NOTE: OTHER_HOST is not required settings 
 
 
 # Set your website route and worker to trigger:
+**Path:** Your Worker → **Settings** → **Triggers** (or **Routes**). Add route pattern e.g. `*yoursite.com/*` or `yoursite.com/*` (replace with your domain).
 
 ![image](https://github.com/user-attachments/assets/405b8681-ed58-470f-8627-d5cde01f3dfc)
 
@@ -162,8 +306,8 @@ Also, Enable CF Cache Reserve to increase edge cache HIT rate. To reduce CF cost
 
 ![image](https://github.com/user-attachments/assets/0c1bc4df-483e-45c8-b3a2-44cfe6dab817)
 
-Disable Cloud Flare Chache for Static and Media save and serve from the **Cache Reserve** <be \>
-Caching -> Cache Rules
+Disable Cloudflare Cache for Static and Media; save and serve from the **Cache Reserve** <br/>
+**Path:** Select your domain (zone) → **Caching** → **Cache Rules**
 ![image](https://github.com/user-attachments/assets/bb3cca02-d45e-4f2b-bf5a-18bfee851c46)
 
 Add Rule 
@@ -172,9 +316,9 @@ Add Rule
 Expression : 
 
 ```
-(http.request.full_uri wildcard "*.site.com/static/*") or (http.request.full_uri wildcard "*.site.com/media/*"
+(http.request.full_uri wildcard "*.yoursite.com/static/*") or (http.request.full_uri wildcard "*.yoursite.com/media/*")
 ```
-Replace **site** with your <br\>
+Replace **yoursite** with your domain. <br/>
 
 Please update this documentation when you will do it yourself. It is just a fast-written manual. 
 For detailed information, check the Worker code. 
@@ -224,7 +368,12 @@ Timing: Server response time must be less than 60ms.
 ![image](https://github.com/user-attachments/assets/5d20a929-e2c3-4a42-9adf-7f703c9a2a2b)
 
 
+# Verification and Troubleshooting
 
+**Check cache status:** Open DevTools → Network, select a request, and look at the response headers. `Cf-Cache-Status: HIT` means the page was served from cache. `DYNAMIC` or `MISS` means it was fetched from the origin.
 
+**Worker debug headers:** The worker adds `x-html-edge-cache-status`, `x-html-edge-cache-version`, `worker-time`, and `js-time` headers. Use these to verify the worker is running and to debug cache behavior.
 
+**Bypass worker for testing:** Add `&cfw=false` to any URL to bypass the worker and compare behavior.
 
+**R2 race:** When using `cf-cdn=false`, responses can come from R2 or from the origin (race). If you see `R2-cache: server-first` or `r2-null-server`, the origin responded first — this is normal. The cache is updated asynchronously.
