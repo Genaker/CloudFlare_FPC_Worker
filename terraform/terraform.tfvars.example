@@ -1,0 +1,38 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# NEVER commit terraform.tfvars — it contains secrets.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+
+# ---------------------------------------------------------------------------
+# Required
+# ---------------------------------------------------------------------------
+
+# Cloudflare API token — create one at https://dash.cloudflare.com/profile/api-tokens
+# Required permissions: Workers Scripts:Edit, Workers KV Storage:Edit,
+#                       Workers R2 Storage:Edit, Zone:Zone:Read, Zone:Zone Settings:Edit
+cloudflare_api_token  = "YOUR_CLOUDFLARE_API_TOKEN"
+
+# Find your Account ID in the Cloudflare dashboard → Workers & Pages → Overview (right sidebar)
+cloudflare_account_id = "YOUR_ACCOUNT_ID"
+
+# Find your Zone ID in the Cloudflare dashboard → your domain → Overview (right sidebar)
+cloudflare_zone_id    = "YOUR_ZONE_ID"
+
+# Your site domain (without protocol or trailing slash)
+domain                = "example.com"
+
+# ---------------------------------------------------------------------------
+# Optional overrides (defaults shown)
+# ---------------------------------------------------------------------------
+# worker_name            = "fpc-worker"
+# kv_namespace_title     = "FPC_KV"
+# r2_bucket_name         = "fpc-cache"
+
+# Worker behaviour variables
+# env_debug              = "false"
+# env_speculation_enabled = "true"
+# env_r2_stale           = "true"
+# env_r2_server_race     = "true"
+# env_revalidate_age     = "360"
+# env_god_mod            = "false"
+# env_pwa_enabled        = "true"

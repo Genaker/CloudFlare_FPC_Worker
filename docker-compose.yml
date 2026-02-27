@@ -1,0 +1,35 @@
+# CloudFlare FPC Worker — Test Runner
+#
+# Integration tests (require TEST_URL):
+#   TEST_URL=https://yoursite.com/ docker compose run --rm fpc-tests
+#
+# Unit tests (no TEST_URL needed):
+#   docker compose run --rm fpc-unit
+
+services:
+  fpc-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fpc-tests:latest
+    container_name: fpc_worker_tests
+
+    environment:
+      # Required: URL of the site running the CloudFlare FPC Worker
+      - TEST_URL=${TEST_URL}
+      # Optional: Node.js memory limit (increase for very large test runs)
+      - NODE_OPTIONS=--max-old-space-size=512
+
+    # Use host networking so the container can reach local or VPN-protected sites.
+    # Remove this line if TEST_URL is a public internet address.
+    # network_mode: host
+
+    restart: 'no'
+
+  fpc-unit:
+    build:
+      context: .
+      dockerfile: Dockerfile.unit
+    entrypoint: []
+    command: npm run test:unit
+    restart: 'no'

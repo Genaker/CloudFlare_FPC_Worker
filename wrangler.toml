@@ -1,0 +1,87 @@
+# CloudFlare FPC Worker — Wrangler Configuration
+#
+# Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+#
+# Quick start:
+#   1. Run ./install.sh  (creates KV + R2 and fills in the IDs below)
+#   2. Or set IDs manually and run: wrangler deploy
+
+name            = "fpc-worker"
+main            = "FPC.js"
+compatibility_date = "2024-01-01"
+
+# ---------------------------------------------------------------------------
+# KV Namespace  (cache version counter)
+# The `wrangler kv namespace create` command creates this and prints the ID.
+# Replace REPLACE_WITH_KV_NAMESPACE_ID with the value from that command.
+# ---------------------------------------------------------------------------
+[[kv_namespaces]]
+binding     = "KV"
+id          = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Preview namespace used by `wrangler dev` (optional but recommended).
+# Create with: wrangler kv namespace create "FPC_KV" --preview
+# preview_id = "REPLACE_WITH_KV_PREVIEW_NAMESPACE_ID"
+
+# ---------------------------------------------------------------------------
+# R2 Bucket  (full-page cache backup / stale serving)
+# Create with: wrangler r2 bucket create fpc-cache
+# ---------------------------------------------------------------------------
+[[r2_buckets]]
+binding     = "R2"
+bucket_name = "fpc-cache"
+
+# ---------------------------------------------------------------------------
+# Worker routes — attach this worker to your site.
+# Replace example.com with your actual domain.
+# ---------------------------------------------------------------------------
+routes = [
+  { pattern = "example.com/*", zone_name = "example.com" }
+]
+
+# ---------------------------------------------------------------------------
+# Environment variables (Worker "Variables & Secrets" in the dashboard)
+# Prefix each variable with ENV_ — FPC.js reads them via getConfigValue().
+# ---------------------------------------------------------------------------
+[vars]
+# Set to "false" in production to hide internal cache debug headers.
+ENV_DEBUG               = "false"
+
+# Enable Speculation Rules injection (prefetch/prerender).
+ENV_SPECULATION_ENABLED = "true"
+
+# Serve stale R2 content while the fresh version is fetched.
+ENV_R2_STALE            = "true"
+
+# Race R2 and origin — serve whichever responds first.
+ENV_R2_SERVER_RACE      = "true"
+
+# Revalidate stale CDN cache entries older than N seconds.
+ENV_REVALIDATE_AGE      = "360"
+
+# Lock all cache invalidations (100 % static mode).
+ENV_GOD_MOD             = "false"
+
+# PWA manifest injection.
+ENV_PWA_ENABLED         = "true"
+
+# ---------------------------------------------------------------------------
+# Secrets (set with `wrangler secret put ENV_CLOUDFLARE_API_KEY` etc.)
+# Never commit real values here — use `wrangler secret put` instead.
+# ---------------------------------------------------------------------------
+# ENV_CLOUDFLARE_API_KEY = "<set via wrangler secret put>"
+
+# ---------------------------------------------------------------------------
+# Development / preview environment overrides
+# ---------------------------------------------------------------------------
+[env.preview]
+name = "fpc-worker-preview"
+vars = { ENV_DEBUG = "true" }
+
+[[env.preview.kv_namespaces]]
+binding     = "KV"
+id          = "REPLACE_WITH_KV_PREVIEW_NAMESPACE_ID"
+
+[[env.preview.r2_buckets]]
+binding     = "R2"
+bucket_name = "fpc-cache-preview"

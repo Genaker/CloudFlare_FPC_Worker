@@ -1,0 +1,13 @@
+# CloudFlare FPC Worker — Unit Test Runner
+#
+# Uses full Node image (not Alpine) for Miniflare compatibility.
+# Run: docker compose run --rm fpc-unit
+
+FROM node:20-slim
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm install
+
+COPY . .

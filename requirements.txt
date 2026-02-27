@@ -1,0 +1,11 @@
+# CloudFlare FPC Worker — Python deploy tool dependencies
+#
+# Install:  pip install -r requirements.txt
+#           pip install -r requirements.txt --break-system-packages  (system Python on Debian/Ubuntu)
+
+# Required — HTTP client for Cloudflare REST API calls
+requests>=2.31.0
+
+# Optional — rich terminal UI (colours, tables, prompts)
+# Remove this line if you want a plain-text interface with no extra deps.
+rich>=13.0.0

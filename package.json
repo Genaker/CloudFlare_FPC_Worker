@@ -6,7 +6,12 @@
   "type": "module",
   "scripts": {
     "generate": "node generate.js",
-    "test": "jest"
+    "test": "jest --config=jest.config.cjs",
+    "test:watch": "jest --config=jest.config.cjs --watch",
+    "test:verbose": "jest --config=jest.config.cjs --verbose",
+    "test:ci": "jest --config=jest.config.cjs --ci --forceExit --runInBand",
+    "test:unit": "vitest run --config vitest.unit.config.js",
+    "test:unit:watch": "vitest --config vitest.unit.config.js"
   },
   "repository": {
     "type": "git",
@@ -27,7 +32,12 @@
   },
   "homepage": "https://github.com/Genaker/CloudFlare_FPC_Worker#readme",
   "devDependencies": {
-    "jest": "^29.7.0"
+    "@babel/core": "^7.24.0",
+    "@babel/preset-env": "^7.24.0",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
+    "miniflare": "^3.20241106.1",
+    "vitest": "^2.0.0"
   },
   "dependencies": {
     "js-crawler": "^0.3.21",

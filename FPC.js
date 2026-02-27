@@ -4,48 +4,41 @@
 // instead of the full cache.
 
 // Separate cache for the mobile devices
-var MOBILECACHE_DIFFERENT = false;
+let MOBILECACHE_DIFFERENT = false;
 
-var KV_CONFIG_LAST_SYNC = null;
+let KV_CONFIG_LAST_SYNC = null;
 
-var KV_CONFIG_CHECK = [];
-var KV_CONFIG = [];
-var JSON_CONFIG = {};
+const KV_CONFIG_CHECK = {};
+const KV_CONFIG = {};
+let JSON_CONFIG = {};
 
-var IP_count = [];
+//KV Config doesn't make sense. ENV var change automatically deploys new Worker version
+const KV_CONFIG_ENABLED = false;
 
-//KV Config doesn't make sens. ENV var change automatically deploys new Worker version 
-var KV_CONFIG_ENABLED = false;
-
-//limited to 128 MB
-var WORKER_CACHE_STORAGE = [];
-var WORKER_CACHE_STAT = [];
-
-// API settings if KV isn't being used
-var CLOUDFLARE_API = {
+// API settings if KV isn't being used (legacy fallback — prefer KV binding)
+const CLOUDFLARE_API = {
     email: "", // From https://dash.cloudflare.com/profile
     key: "", // Global API Key from https://dash.cloudflare.com/profile
     zone: "" // "Zone ID" from the API section of the dashboard overview page https://dash.cloudflare.com/
 };
 
 // No cache values
-var CACHE_CONTROL_NO_CACHE = [
+const CACHE_CONTROL_NO_CACHE = [
     'no-cache',
     'no-store'
 ];
 
 // Default cookie prefixes for logged-in users
-var VERSION_COOKIES = [
+const VERSION_COOKIES = [
     "X-Magento-Vary"
 ];
 
 // Default cookie prefixes for bypass
-var DEFAULT_BYPASS_COOKIES = [
+const DEFAULT_BYPASS_COOKIES = [
     'admin'
-    //"X-Magento-Vary"
 ];
 
-var R2_CAHE_LOGGEDIN_USERS = false;
+let R2_CACHE_LOGGEDIN_USERS = false;
 const USER_COOKIES = [
     'X-Magento-Vary'
 ];
@@ -53,13 +46,13 @@ const USER_COOKIES = [
 const FORM_KEY = 'form_key';
 
 const CSPRO_HEADER = 'content-security-policy-report-only';
-var CSPRO_REMOVE = true;
+let CSPRO_REMOVE = true;
 
-var ADMIN_URL = null;
-var BODY_MIN_SIZE = 3 * 1024;
+let ADMIN_URL = null;
+let BODY_MIN_SIZE = 3 * 1024;
 
-// Filtered get parameters
-var FILTER_GET = [
+// Filtered get parameters (reassigned in processConfig via ENV_FILTER_GET)
+let FILTER_GET = [
     // Facebook related
     'fbclid',
     'fb_ad',
@@ -148,16 +141,14 @@ var FILTER_GET = [
     'cf-revalidate'
 ];
 
-var CACHE_STATUSES = [
+const CACHE_STATUSES = [
     200,
     301,
-    //302, Bots creats a lot of riddirects of this type. 
-    //404
 ];
 
-var ALLOWED_GET_ONLY = false;
-//Whitelisted GET parameters
-var ALLOWED_GET = [
+let ALLOWED_GET_ONLY = false;
+// Whitelisted GET parameters (reassigned in processConfig via ENV_ALLOWED_GET)
+let ALLOWED_GET = [
     'product_list_order',
     'p',
     'product_list_limit',
@@ -170,8 +161,8 @@ var ALLOWED_GET = [
     'mode'
 ];
 
-// URLs will not be cached
-var BYPASS_URL = [
+// URLs will not be cached (ENV_ADMIN_URL is appended in processConfig)
+let BYPASS_URL = [
     'order',
     'onestepcheckout',
     'admin',
@@ -197,38 +188,37 @@ var BYPASS_URL = [
     'wp-content/uploads'
 ];
 
-// URL will always be cached no matter what
-var CACHE_ALWAYS = [
+// URLs that are always cached regardless of other bypass rules
+const CACHE_ALWAYS = [
     'customer-service',
     'banner/ajax/load'
-]
+];
 
-//Some legacy stuff. Bots doesn't have it and produces cache MISSES
-var ACCEPT_CONTENT_HEADER = 'Accept';
+// Some legacy stuff. Bots don't have Accept header and produce cache MISSES
+const ACCEPT_CONTENT_HEADER = 'Accept';
 
-// Config variables will be assigned in the main loop.
-var DEBUG;
-var CUSTOM_CORS;
-var CUSTOM_PRELOAD;
-var CUSTOM_SPECULATION;
-var SPECULATION_ENABLED;
-var SPECULATION_CACHED_ONLY;
-var ENABLE_ESI_BLOCKS = false;
-// Prevent any cache invalidations - 100% static 
-var GOD_MOD;
-// Revalidate the cache every N secs
-// User will receive old/stale version
-var REVALIDATE_AGE;
-var R2_STALE = true;
-// Send R2 and Server response semultaniosly and use which one will be recieved first
-var R2_SERVER_RACE = true;
-var TEST;
+// Config variables assigned from ENV vars in processConfig().
+let DEBUG;
+let CUSTOM_CORS;
+let CUSTOM_PRELOAD;
+let CUSTOM_SPECULATION;
+let SPECULATION_ENABLED;
+let SPECULATION_CACHED_ONLY;
+let ENABLE_ESI_BLOCKS = false;
+// Prevent any cache invalidations — 100% static mode
+let GOD_MOD;
+// Revalidate the cache every N seconds; user receives stale content during revalidation
+let REVALIDATE_AGE;
+let R2_STALE = true;
+// Race R2 and origin — serve whichever responds first
+let R2_SERVER_RACE = true;
+let TEST;
 
-var HTML_CACHE_VERSION = false;
-var PWA_SPECULATION_VERSION = 1;
-var PWA_ENABLED = true;
-var PWA_IMAGE = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48IS0tIFVwbG9hZGVkIHRvOiBTVkcgUmVwbywgd3d3LnN2Z3JlcG8uY29tLCBHZW5lcmF0b3I6IFNWRyBSZXBvIE1peGVyIFRvb2xzIC0tPgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIKYXJpYS1sYWJlbD0iQ2xvdWRmbGFyZSIgcm9sZT0iaW1nIgp2aWV3Qm94PSIwIDAgNTEyIDUxMiI+PHJlY3QKd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiCnJ4PSIxNSUiCmZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjZjM4MDIwIiBkPSJNMzMxIDMyNmMxMS0yNi00LTM4LTE5LTM4bC0xNDgtMmMtNCAwLTQtNiAxLTdsMTUwLTJjMTctMSAzNy0xNSA0My0zMyAwIDAgMTAtMjEgOS0yNGE5NyA5NyAwIDAgMC0xODctMTFjLTM4LTI1LTc4IDktNjkgNDYtNDggMy02NSA0Ni02MCA3MiAwIDEgMSAyIDMgMmgyNzRjMSAwIDMtMSAzLTN6Ii8+PHBhdGggZmlsbD0iI2ZhYWU0MCIgZD0iTTM4MSAyMjRjLTQgMC02LTEtNyAxbC01IDIxYy01IDE2IDMgMzAgMjAgMzFsMzIgMmM0IDAgNCA2LTEgN2wtMzMgMWMtMzYgNC00NiAzOS00NiAzOSAwIDIgMCAzIDIgM2gxMTNsMy0yYTgxIDgxIDAgMCAwLTc4LTEwMyIvPjwvc3ZnPg=="
-var PWA_MANIFEST = { "theme_color": "#ffffff", "background_color": "#ffffff", "icons": [{ "sizes": "any", "src": PWA_IMAGE, "type": "image/svg+xml" }], "orientation": "any", "display": "standalone", "dir": "auto", "lang": "en-US", "id": "https://your-domain.com/", "start_url": "/", "scope": "https://your-domain.com/", "description": "Cloud Flare Magento PWA", "name": "Magento PWA", "short_name": "M2 PWA", "prefer_related_applications": false };
+let HTML_CACHE_VERSION = false;
+let PWA_SPECULATION_VERSION = 1;
+let PWA_ENABLED = true;
+const PWA_IMAGE = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48IS0tIFVwbG9hZGVkIHRvOiBTVkcgUmVwbywgd3d3LnN2Z3JlcG8uY29tLCBHZW5lcmF0b3I6IFNWRyBSZXBvIE1peGVyIFRvb2xzIC0tPgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIKYXJpYS1sYWJlbD0iQ2xvdWRmbGFyZSIgcm9sZT0iaW1nIgp2aWV3Qm94PSIwIDAgNTEyIDUxMiI+PHJlY3QKd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiCnJ4PSIxNSUiCmZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjZjM4MDIwIiBkPSJNMzMxIDMyNmMxMS0yNi00LTM4LTE5LTM4bC0xNDgtMmMtNCAwLTQtNiAxLTdsMTUwLTJjMTctMSAzNy0xNSA0My0zMyAwIDAgMTAtMjEgOS0yNGE5NyA5NyAwIDAgMC0xODctMTFjLTM4LTI1LTc4IDktNjkgNDYtNDggMy02NSA0Ni02MCA3MiAwIDEgMSAyIDMgMmgyNzRjMSAwIDMtMSAzLTN6Ii8+PHBhdGggZmlsbD0iI2ZhYWU0MCIgZD0iTTM4MSAyMjRjLTQgMC02LTEtNyAxbC01IDIxYy01IDE2IDMgMzAgMjAgMzFsMzIgMmM0IDAgNCA2LTEgN2wtMzMgMWMtMzYgNC00NiAzOS00NiAzOSAwIDIgMCAzIDIgM2gxMTNsMy0yYTgxIDgxIDAgMCAwLTc4LTEwMyIvPjwvc3ZnPg==";
+let PWA_MANIFEST = { "theme_color": "#ffffff", "background_color": "#ffffff", "icons": [{ "sizes": "any", "src": PWA_IMAGE, "type": "image/svg+xml" }], "orientation": "any", "display": "standalone", "dir": "auto", "lang": "en-US", "id": "https://your-domain.com/", "start_url": "/", "scope": "https://your-domain.com/", "description": "Cloud Flare Magento PWA", "name": "Magento PWA", "short_name": "M2 PWA", "prefer_related_applications": false };
 
 processConfig();
 
@@ -236,14 +226,8 @@ processConfig();
 * Main worker entry point.
 */
 addEventListener("fetch", async event => {
-    let startWorkerTime = Date.now();
-    let startConfigTime = Date.now();
-
-    let endConfigTime = Date.now();
-    console.log('Config Processing Time: ' + (endConfigTime - startConfigTime).toString());  // 0
-
     console.log(event.request);
-    let context = {
+    const context = {
         event: event,
         promise: null,
         'r2-race': R2_SERVER_RACE,
@@ -278,8 +262,6 @@ addEventListener("fetch", async event => {
 
     const bypassCookies = shouldBypassEdgeCache(event.request);
     const bypassUrl = shouldBypassURL(request0);
-
-    const IP = event.request.headers.get('CF-Connecting-IP');
 
     if (typeof event.request.cf.botManagement !== 'undefined') {
         // Requires enterprise plan
@@ -343,12 +325,11 @@ addEventListener("fetch", async event => {
         cacheUrl.searchParams.delete('cf-revalidate');
     }
     if (cacheUrl.searchParams.get('cf-ttl')) {
-        context["CDN-ttl"] = parseInt(cacheUrl.searchParams.get('cf-ttl'));;
+        context["CDN-ttl"] = parseInt(cacheUrl.searchParams.get('cf-ttl'));
         cacheUrl.searchParams.delete('cf-ttl');
     }
     if (cacheUrl.searchParams.get('r2-race')) {
         context["r2-race"] = parseBoolean(cacheUrl.searchParams.get('r2-race'));
-        R2_SERVER_RACE = parseBoolean(cacheUrl.searchParams.get('r2-race'));
         cacheUrl.searchParams.delete('r2-race');
     }
 
@@ -368,8 +349,8 @@ addEventListener("fetch", async event => {
 
     let upstreamCache = request.headers.get('x-HTML-Edge-Cache');
     context.cookies = request.headers.get('cookie');
-    let specalationRequest = request.headers.get('Sec-Purpose');
-    if (specalationRequest) {
+    let speculationRequest = request.headers.get('Sec-Purpose');
+    if (speculationRequest) {
         context['speculation'] = true;
     }
 
@@ -556,7 +537,7 @@ async function processRequest(originalRequest, context) {
                 ['GET', 'HEAD'].includes(originalRequest.method) && CACHE_STATUSES.includes(response.status) &&
                 !bypassCache) {
                 console.log("Caching...");
-                status += ",Caching Async,";
+                status += ",CachingAsync,";
                 event.waitUntil(cacheResponse(cacheVer, originalRequest, response, context, cacheAlways));
                 console.log("Status: " + status);
             } else {
@@ -633,7 +614,6 @@ async function processRequest(originalRequest, context) {
         response.headers.append('Server-Timing', 'get-cache;desc="Get CF CDN CACHE";dur=' + getCacheTime.toString());
 
         status = status.replaceAll(",,", ",");
-        status = status.replaceAll(" ", "");
         if (DEBUG)
             response.headers.set('x-HTML-Edge-Cache-Status', status);
         if (cacheVer !== null) {
@@ -886,6 +866,92 @@ async function getCachedResponse(request, context) {
                 console.log("From CDN EDGE cache");
             }
 
+            // R2 lookup block
+            const getR2BlockTimeStart = Date.now();
+            if (context["R2-miss"] || (R2_CACHE_LOGGEDIN_USERS === false && checkCookies(request.headers.get('cookie'), USER_COOKIES))) {
+                R2check = false;
+            }
+            let useR2Stale = R2_STALE;
+            let R2Result, R2ResultPrommis, raceResponse, serverResponse = null;
+            context['r2-use-stale'] = useR2Stale;
+            let R2ResultStalePrommis = null;
+            if (!cachedResponse && typeof R2 !== 'undefined' && R2check) {
+                // ToDo: Another level of improvemnts can be send Race Server request here... 
+                // Clone the request, add the edge-cache header and send it through.
+                const r2Race = context['r2-race'];
+                let controller, signal;
+                if (r2Race) {
+                    controller = new AbortController();
+                    signal = controller.signal;
+                }
+
+                request = new Request(request.clone(), {
+                    headers: {
+                        ...Object.fromEntries(request.headers.entries()),
+                        "Accept-Encoding": "br, gzip", // Request both Brotli and Gzip support
+                        "R2-cache-race": "true"
+                    },
+                });
+                console.log("R2-Server URL: " + request.url);
+                if (r2Race) {
+                    serverResponse = fetch(request, { signal });
+                }
+                const R2ResultPromise = getR2(cacheKeyRequest, request, cacheVer, context, cacheAlways);
+                const R2ResultStalePromise = getR2(staleCacheKeyRequest, request, "stale", context, cacheAlways);
+
+                if (r2Race) {
+                    // Use whichever promise resolves first — R2 or origin server.
+                    raceResponse = await Promise.race([R2ResultPromise, serverResponse]);
+                } else {
+                    raceResponse = await R2ResultPromise;
+                }
+                // Check the type of the resolved object
+                if (r2Race && raceResponse instanceof Response) {
+                    context['r2-server-first'] = true;
+                    context['r2-cache'] = "server-first";
+                    console.log("Response form Server was recieved first");
+                    status += ",ServerRace,ServerRespFirst,";
+                    // Save resolved Promise to the context to reuse inside of the main fetch logic 
+                    context.serverPromise = raceResponse;
+                    return { response: null, cacheVer, status, bypassCache, needsRevalidate, cacheAlways };
+                } else if (raceResponse['fromR2'] === true) {
+                    R2Result = raceResponse;
+                    context['r2-cache'] = true;
+                    fromR2 = R2Result['fromR2'];
+                    status += R2Result['status'];
+                    cachedResponse = R2Result['cachedResponse'];
+                } else {
+                    R2Result = null;
+                    cachedResponse = null;
+                }
+
+                if (!cachedResponse && useR2Stale) {
+                    let R2ResultStale = await R2ResultStalePromise;
+                    fromR2 = R2ResultStale['fromR2'];
+                    status += R2ResultStale['status'];
+
+                    cachedResponse = R2ResultStale['cachedResponse'];
+                    if (cachedResponse) {
+                        if (r2Race) {
+                            controller.abort();
+                        }
+                        status += ",R2Stale,";
+                        R2StaleUsed = true;
+                        needsRevalidate = true;
+                    } else {
+                        if (r2Race) {
+                            status += ",R2StaleNull,Server,Miss,";
+                            context['r2-cache'] = "r2-null-server";
+                            // Save Promise to the context to reuse instead of main fetch
+                            context.serverPromise = serverResponse;
+                            return { response: null, cacheVer, status, bypassCache, needsRevalidate, cacheAlways };
+                        }
+                    }
+                }
+            }
+            const getR2BlockTimeEnd = Date.now();
+            console.log("R2 GET Block Time: " + (getR2BlockTimeEnd - getR2BlockTimeStart).toString());
+
             let useStale = true;
 
             if (cachedResponse) {
@@ -948,6 +1014,95 @@ async function getCachedResponse(request, context) {
     }
 
     return { response, cacheVer, status, bypassCache, needsRevalidate, cacheAlways };
+}
+
+/**
+ * Get Response from the R2 cache
+ * 
+ * @param {*} cacheKeyRequest - cache key
+ * @param {Request} request - original request
+ * @param {Number|String} cacheVer - cache version
+ * @param {object} context  - cache app context
+ * @param {boolean} cacheAlways - if cache it anyway
+ * @returns 
+ */
+async function getR2(cacheKeyRequest, request, cacheVer, context, cacheAlways) {
+    let fromR2 = false;
+    let event = context.event;
+    let status = "";
+    let abort = false;
+    let cachedResponse = null;
+
+    console.log("Not from CDN EDGE cache");
+    console.log("Checking R2: " + cacheKeyRequest.url);
+
+    const getTimeStart = Date.now();
+    // Retrieves the R2Object for the given key containing 
+    // if the key exists, and null if the key does not exist.
+    let R2Response = null;
+
+    // If R2 race server request disabled or it is stale using regular flow
+    R2Response = await R2.get(cacheKeyRequest.url);
+
+    if (R2Response && R2Response.customMetadata['R2-Status'] === "200" && R2Response.size < BODY_MIN_SIZE) {
+        R2Response = null;
+    }
+    const getTimeEnd = Date.now();
+    console.log("R2 GET TIME: " + (getTimeEnd - getTimeStart))
+    console.log(R2Response);
+
+    if (R2Response !== null) {
+        context['r2-cache'] = true;
+        //controller.abort();
+        console.log("R2 GET Size: " + String(R2Response.size));
+        console.log([Object.keys(R2Response.customMetadata), Object.values(R2Response.customMetadata)]);
+        const headers = new Headers(R2Response.customMetadata);
+        // R2Response.writeHttpMetadata(headers);
+        headers.set("etag", R2Response.httpEtag);
+        // Extract Content-Encoding from metadata
+        const encoding = R2Response.httpMetadata?.contentEncoding;
+        headers.set("R2-Enc", encoding);
+        headers.set("R2-Get", "" + (getTimeEnd - getTimeStart).toString());
+        headers.append('Server-Timing', 'r2-get;desc="Get from R2 Time";dur=' + (getTimeEnd - getTimeStart).toString());
+
+        headers.set("R2", "true");
+        let R2Time = parseInt(headers.get("R2-Time"));
+        let timeNow = Date.now() / 1000;
+        let R2Status = parseInt(headers.get("R2-Status"));
+        let R2age = Math.abs(timeNow - R2Time);
+        headers.set("age", R2age.toString());
+        let saveR2toCDNcache = true;
+        if (R2age > REVALIDATE_AGE || REVALIDATE_AGE < 3) {
+            //Any value bigger than REVALIDATE_AGE
+            headers.set("age", "99999999");
+            saveR2toCDNcache = false;
+        }
+        if (cacheVer === "stale") {
+            headers.set("R2-stale", "true");
+            headers.set("R2-stale-url", cacheKeyRequest.url);
+        }
+        fromR2 = true;
+        status += ",FromR2,";
+
+        R2Response = new Response(R2Response.body, {
+            headers: headers, status: R2Status
+        });
+        cachedResponse = R2Response;
+        console.log("From R2");
+        if (saveR2toCDNcache === true && cacheVer !== "stale") {
+            console.log("Save from R2 to CDN");
+            status += ',SavedCDNasync,';
+            // remove clone 
+            event.waitUntil(cacheResponse(cacheVer, request, R2Response.clone(), event, cacheAlways));
+        }
+        console.log(cachedResponse);
+        console.log(cachedResponse.headers.get("R2"));
+    } else {
+        console.log("Not from R2");
+        context['r2-cache'] = "miss";
+    }
+
+    return { fromR2, status, cachedResponse };
 }
 
 /**
@@ -1048,7 +1203,7 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
                 if (await checkBodySize(clonedResponse.clone(), BODY_MIN_SIZE) === false) {
                     return status += "BYPASSBYSIZE";
                 }
-                bodySizeTime = bodyTimeStart - Date.now();
+                bodySizeTime = Date.now() - bodyTimeStart;
             }
             //originalResponse.body.cancel();
             let response = new Response(clonedResponse.body, clonedResponse);
@@ -1077,17 +1232,110 @@ async function cacheResponse(cacheVer, request, originalResponse, context, cache
             cdnCachedResponse.headers.delete("R2-Get");
 
             let cachePromise = await cache.put(cacheKeyRequest, cdnCachedResponse);
-            status += ",Saved CDN,";
+            status += ",SavedCDN,";
             context.version = cacheVer.toString();
 
-            // Wait for cache Promise
-            //await Promise.resolve(cachePromise);
+            status += await saveToR2(cacheKeyRequest, response, context);
         } catch (err) {
             console.log("Catch Cache Error: " + err.message);
             status += ",Cache Response Exception:" + err.message + ",";
         }
     }
     return status;
+}
+
+/**
+ * Save response to R2
+ * 
+ * @param {*} cacheKeyRequest - cache key
+ * @param {Response} response - response
+ * @param {object} context 
+ * @returns 
+ */
+async function saveToR2(cacheKeyRequest, response, context) {
+    let status = "";
+
+    if (R2_CACHE_LOGGEDIN_USERS === false && checkCookies(cacheKeyRequest.headers.get('cookie'), USER_COOKIES)) {
+        return status;
+    }
+
+    if (typeof R2 !== 'undefined' && response.headers.get("R2") !== "true") {
+        let headersMetadata = {};
+        response.headers.forEach((value, key) => {
+            headersMetadata[key] = value;
+        });
+
+        headersMetadata["R2-Time"] = Date.now() / 1000;
+        headersMetadata["R2-Cache-Version"] = context.version;
+        headersMetadata["R2-Status"] = response.status;
+
+        // Max Size of the metadata 8Kb ~ 8000chars
+        //delete headersMetadata['content-security-policy-report-only'];
+        if (typeof headersMetadata['content-security-policy-report-only'] !== 'undefined')
+            headersMetadata['content-security-policy-report-only'] = headersMetadata['content-security-policy-report-only'].substring(0, 6000) + "...";
+
+        try {
+            let startTime = Date.now();
+            console.log("R2 caching...");
+            let oldR2Hash = null;
+            // Get metadata only without body
+            const R2old = await R2.head(cacheKeyRequest.url);
+
+            if (R2old) {
+                oldR2Hash = R2old.customMetadata['R2-hash'];
+            }
+
+            const respCopy = new Response(response.clone().body, response);
+
+            let startHashTime = Date.now();
+            //This stuff does magic
+            const respText = await respCopy.blob(); //bytes();body;blob();text();arrayBuffer();body;ReadableStream()
+            //const respText = await respCopy.text();
+            //console.log("Response size: " + (respText.byteLength / 1000) + "Kb");
+            const newR2hash = await hash(await respText.text(), context);
+            headersMetadata["R2-hash"] = newR2hash;
+            let endHashTime = Date.now();
+            headersMetadata["H-time"] = endHashTime - startHashTime;
+
+            if (newR2hash !== oldR2Hash) {
+                let endTime = Date.now();
+                console.log("Clone Time: " + (endTime - startTime));
+                const putTimeStart = Date.now();
+                let savedR2 = await putR2(cacheKeyRequest, respText, headersMetadata);
+                context.promise = savedR2;
+                const putTimeEnd = Date.now();
+                console.log("Put Time: " + (putTimeEnd - putTimeStart));
+                console.log(`R2 Put ${cacheKeyRequest.url} successfully!`);
+                status += ",SaveR2,";
+            }
+        } catch (error) {
+            console.log("R2 PUT ERROR:" + error.message);
+        }
+        return status;
+    }
+    return status;
+}
+
+/**
+ * Save Response (Body and Headers) to R2 
+ * 
+ * @param {*} cacheKeyRequest - cache key
+ * @param {*} respText - response to cache
+ * @param {*} headersMetadata - headers metadata
+ * @returns 
+ */
+async function putR2(cacheKeyRequest, respText, headersMetadata) {
+
+    let options = {
+        customMetadata: headersMetadata
+    };
+    console.log("R2 Content Encoding: " + headersMetadata['content-encoding']);
+    if (headersMetadata['content-encoding']) {
+        options['httpMetadata'] = { contentEncoding: headersMetadata['content-encoding'] };
+    }
+
+    let result = await R2.put(cacheKeyRequest.url, respText, options);
+    return result;
 }
 
 /******************************************************************************
@@ -1131,25 +1379,6 @@ function getResponseOptions(response) {
     }
 
     return options;
-}
-
-/**
- * Response check cache-control headers
- * 
- * @param {Response} response 
- * @returns bool
- */
-function getResponseCacheControl(response) {
-    let cache = true;
-    let header = response.headers.get('cache-control');
-    if (header) {
-        let cacheControls = header.split(',');
-        for (let cacheControl of cacheControls) {
-
-        }
-    }
-
-    return cache;
 }
 
 /**
@@ -1578,9 +1807,9 @@ function processConfig() {
  */
 async function syncKvConfig() {
     try {
-        Object.keys(KV_CONFIG_CHECK).forEach(async (confName) => {
+        for (const confName of Object.keys(KV_CONFIG_CHECK)) {
             KV_CONFIG[confName] = await KV.get(confName);
-        });
+        }
     } catch (error) {
         console.log(error);
     }
